@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- <div style="position: relative; color: red;">
+            <h3>Tooltips with Vue 3 Teleport</h3>
+            <div>
+                <modal-button></modal-button>
+            </div>
+        </div> -->
+    </div>
+    <script>
+        // const app = Vue.createApp({});
+
+        // app.component('modal-button', {
+        //     template: `
+        //         <button @click="modalOpen = true">
+        //             Open full screen modal!
+        //         </button>
+
+        //         <div v-if="modalOpen" class="modal">
+        //         <div>
+        //             I'm a modal! 
+        //             <button @click="modalOpen = false">
+        //             Close
+        //             </button>
+        //         </div>
+        //         </div>
+        //     `,
+        //     data() {
+        //         return {
+        //             modalOpen: false
+        //         }
+        //     }
+        // })
+
+        // app.component('modal-button', {
+        //     template: `
+        //         <button @click="modalOpen = true">
+        //             Open full screen modal! (With teleport!)
+        //         </button>
+
+        //         <teleport to="body">
+        //         <div v-if="modalOpen" class="modal">
+        //             <div>
+        //             I'm a teleported modal! 
+        //             (My parent is "body")
+        //             <button @click="modalOpen = false">
+        //                 Close
+        //             </button>
+        //             </div>
+        //         </div>
+        //         </teleport>
+        //     `,
+        //     data() {
+        //         return {
+        //             modalOpen: false
+        //         }
+        //     }
+        // })
+        const app = Vue.createApp({
+            template: `
+    <h1>Root instance</h1>
+    <parent-component />
+  `
+        })
+
+        app.component('parent-component', {
+            template: `
+    <h2>This is a parent component</h2>
+    <teleport to="#endofbody">
+      <child-component name="John" />
+    </teleport>
+  `
+        })
+
+        app.component('child-component', {
+            props: ['name'],
+            template: `
+    <div>Hello, {{ name }}</div>
+  `
+        })
+        app.mount('#app')
+
+        // <teleport to="#modals">
+        // <div>A</div>
+        // </teleport>
+        // <teleport to="#modals">
+        // <div>B</div>
+        // </teleport>
+
+        // <!-- result-->
+        // <div id="modals">
+        // <div>A</div>
+        // <div>B</div>
+        // </div>
+    </script>
+</body>
+
+</html>

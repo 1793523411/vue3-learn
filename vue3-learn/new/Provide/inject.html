@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <todo-list></todo-list>
+        <todo-list-statistics></todo-list-statistics>
+    </div>
+    <script>
+        const app = Vue.createApp({})
+
+        app.component('todo-list', {
+            data() {
+                return {
+                    todos: ['Feed a cat', 'Buy tickets']
+                }
+            },
+            provide: {
+                user: 'John Doe'
+            },
+            // provide() {
+            //     // 要访问组件实例属性，我们需要转换provide为返回对象的函数
+            //     return {
+            //         todoLength: this.todos.length
+            //     }
+            // },
+            // provide() {
+            //     // 如果我们想对祖先组件中的更改做出反应，则需要computed为我们提供的对象分配Composition API 属性todoLength
+            //     return {
+            //         todoLength: Vue.computed(() => this.todos.length)
+            //     }
+            // },
+            template: `
+                <div>
+                {{ todos.length }}
+                <!-- rest of the template -->
+                </div>
+            `
+        })
+
+        app.component('todo-list-statistics', {
+            inject: ['user'],
+            created() {
+                console.log(`Injected property: ${this.user}`) // > Injected property: John Doe
+            }
+        })
+
+        app.mount('#app')
+    </script>
+</body>
+
+</html>

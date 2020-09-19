@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <span>Message: {{ msg }}</span>
+        <span v-once>This will never change: {{ msg }}</span>
+        <p>Using mustaches: {{ rawHtml }}</p>
+        <p>Using v-html directive: <span v-html="rawHtml"></span></p>
+        <!-- Mustaches cannot be used inside HTML attributes. Instead, use a v-bind directive -->
+        <div v-bind:id="dynamicId">
+            <!-- {{a}} -->
+        </div>
+        <button v-bind:disabled="isButtonDisabled">Button</button>
+
+        <div>{{ number + 1 }} {{ ok ? 'YES' : 'NO' }} {{ message.split('').reverse().join('')}}</div>
+
+        <p v-if="seen">Now you see me</p>
+
+        <a v-bind:href="url"> ... </a>
+
+        <!-- <a v-bind:[attributeName]="">...</a> -->
+        <!-- <a v-on:[eventName]="doSomething"> ... </a> -->
+        <!-- <form v-on:submit.prevent="onSubmit">...</form> -->
+
+        <!-- <a v-bind:['foo' + bar]="value"> ... </a> -->
+
+    </div>
+
+
+    <script>
+        const Msg = {
+            data() {
+                return {
+                    msg: 'aaa',
+                    rawHtml: '<h1>title1</h1>',
+                    isButtonDisabled: true,
+                    dynamicId: 'dynamicId',
+                    number: 1,
+                    message: "this is a message",
+                    ok: true,
+                    seen: 'true',
+                    url: 'https://cnblogs.com/ycoder',
+                }
+            },
+        }
+        const vm = Vue.createApp(Msg).mount('#app')
+
+    //     Vue.createApp({
+    //         data(){
+    //             return {
+    //                 a:"aaa"
+    //             }
+    //         }
+    //     }).mount('#dynamicId')
+    // </script>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- @click不会渲染到标签上 -->
+        <div @click="btn">buttom</div>
+    </div>
+    <script>
+        Vue.createApp({
+            methods: {
+                btn(){
+                    console.log('button')
+                }
+            },
+        }).mount('#app')
+    </script>
+</body>
+
+</html>

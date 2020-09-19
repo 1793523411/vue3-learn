@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div :class="{ active: isActive }">hello</div>
+        <div class="static" :class="{ active: isActive, 'text-danger': hasError }"> world</div>
+        <div :class="classObject">classObject</div>
+        <div :class="[activeClass, errorClass]">Array Syntax</div>
+        <div :class="[isActive ? activeClass : '', errorClass]">Array Syntax ?:</div>
+        <div :class="[{ active: isActive }, errorClass]">:class="[{ active: isActive }, errorClass]"</div>
+        <my-component class="baz boo"></my-component>
+        <my-component :class="{ active: isActive }"></my-component>
+        <my-component2 class="baz"></my-component2>
+
+        <div :style="{ color: activeColor, fontSize: fontSize + 'px' }">style</div>
+        <div :style="styleObject">styleObj</div>
+        <div :style="[baseStyles, overridingStyles]">[baseStyles, overridingStyles]</div>
+        <div :style="{ color: ['-webkit-box', '-ms-flexbox', 'pink'] }">❥(^_-)</div>
+    </div>
+    <script>
+        const app = Vue.createApp({
+            data() {
+                return {
+                    isActive: true,
+                    hasError: true,
+                    activeClass: 'active',
+                    errorClass: 'text-danger',
+                    activeColor: 'yellow',
+                    fontSize: 30,
+                    styleObject: {
+                        color: 'green',
+                        fontSize: '13px'
+                    },
+                    baseStyles:{
+                        color:'red'
+                    },
+                    overridingStyles:{
+                        textAlign:'right'
+                    }
+                }
+            },
+            computed: {
+                classObject() {
+                    return {
+                        active: this.isActive && !this.error,
+                        'text-danger': this.error && this.error.type === 'fatal'
+                    }
+                }
+            }
+
+        })
+
+
+        app.component('my-component', {
+            template: `<p class="foo bar">Hi!</p>`
+        })
+        app.component('my-component2', {
+            template: `
+                <p :class="$attrs.class">Hi!</p>
+                <span>This is a child component</span>
+            `
+        })
+        app.mount('#app')
+    </script>
+</body>
+
+<style>
+    .active {
+        color: rgb(0, 255, 13);
+        text-align: center;
+    }
+
+    .text-danger {
+        color: red;
+        font-size: large;
+    }
+
+    .static {
+        width: 100px;
+        height: 100px;
+        border: 1px solid rgb(87, 22, 238);
+    }
+
+    .foo {
+        font-family: Georgia, 'Times New Roman', Times, serif;
+    }
+
+    .bar {
+        font-size: larger;
+        color: aqua;
+    }
+
+    .baz {
+        color: blueviolet;
+    }
+</style>
+
+</html>

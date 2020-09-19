@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <p>Has published books:</p>
+        <span>{{ author.books.length > 0 ? 'Yes' : 'No' }}</span>
+    </div>
+
+    <div id="computed-basics">
+        <p>Has published books:</p>
+        <span>{{ publishedBooksMessage }}</span>
+        <p>方法调用：{{ calculateBooksMessage() }}</p>
+        <div>当前时间：{{now}}</div>
+        <div>全名：{{fullName}}</div>
+        <button @click="ful">改名</button>
+    </div>
+
+    <div id="watch-example">
+        <p>
+            Ask a yes/no question:
+            <input v-model="question" />
+        </p>
+        <p>{{ answer }}</p>
+    </div>
+
+    <div id="demo">{{ fullName }}</div>
+    <div id="demo2">{{ fullName }}</div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@0.12.0/dist/axios.min.js"></script>
+    <script>
+        Vue.createApp({
+            data() {
+                return {
+                    author: {
+                        name: 'John Doe',
+                        books: [
+                            'Vue 2 - Advanced Guide',
+                            'Vue 3 - Basic Guide',
+                            'Vue 4 - The Mystery'
+                        ]
+                    }
+                }
+            }
+        }).mount('#app')
+        Vue.createApp({
+            data() {
+                return {
+                    author: {
+                        name: 'John Doe',
+                        books: [
+                            'Vue 2 - Advanced Guide',
+                            'Vue 3 - Basic Guide',
+                            'Vue 4 - The Mystery'
+                        ]
+                    },
+                    firstName: 'y',
+                    lastName: 'gj'
+                }
+            },
+            methods: {
+                calculateBooksMessage() {
+                    return this.author.books.length > 0 ? 'Yes' : 'No'
+                },
+                ful() {
+                    this.fullName = 'f sz'
+                    console.log(this.firstName)
+                    console.log(this.lastName)
+                }
+            },
+            computed: {
+                // a computed getter
+                publishedBooksMessage() {
+                    // `this` points to the vm instance
+                    return this.author.books.length > 0 ? 'Yes' : 'No'
+                },
+                now() {
+                    return Date.now()
+                },
+                fullName: {
+                    // getter
+                    get() {
+                        return this.firstName + ' ' + this.lastName
+                    },
+                    // setter
+                    set(newValue) {
+                        const names = newValue.split(' ')
+                        this.firstName = names[0]
+                        this.lastName = names[names.length - 1]
+                    }
+                }
+            }
+        }).mount('#computed-basics')
+        const watchExampleVM = Vue.createApp({
+            data() {
+                return {
+                    question: '',
+                    answer: 'Questions usually contain a question mark. ;-)'
+                }
+            },
+            watch: {
+                // whenever question changes, this function will run
+                question(newQuestion, oldQuestion) {
+                    if (newQuestion.indexOf('?') > -1) {
+                        this.getAnswer()
+                    }
+                }
+            },
+            methods: {
+                getAnswer() {
+                    this.answer = 'Thinking...'
+                    axios
+                        .get('https://yesno.wtf/api')
+                        .then(response => {
+                            this.answer = response.data.answer
+                        })
+                        .catch(error => {
+                            this.answer = 'Error! Could not reach the API. ' + error
+                        })
+                }
+            }
+        }).mount('#watch-example')
+        const vm = Vue.createApp({
+            data() {
+                return {
+                    firstName: 'Foo',
+                    lastName: 'Bar',
+                    fullName: 'Foo Bar'
+                }
+            },
+            watch: {
+                firstName(val) {
+                    this.fullName = val + ' ' + this.lastName
+                },
+                lastName(val) {
+                    this.fullName = this.firstName + ' ' + val
+                }
+            }
+        }).mount('#demo')
+
+        const vm2 = Vue.createApp({
+            data() {
+                return {
+                    firstName: 'Foo',
+                    lastName: 'Bar'
+                }
+            },
+            computed: {
+                fullName() {
+                    return this.firstName + ' ' + this.lastName
+                }
+            }
+        }).mount('#demo2')
+
+    </script>
+</body>
+
+</html>

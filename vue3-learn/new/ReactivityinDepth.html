@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+        // const dinner = {
+        //     meal: 'tacos'
+        // }
+
+        // const handler = {
+        //     get(target, prop) {
+        //         return target[prop]
+        //     }
+        // }
+
+        // const proxy = new Proxy(dinner, handler)
+        // console.log(proxy.meal)
+
+        // const dinner = {
+        //     meal: 'tacos'
+        // }
+
+        // const handler = {
+        //     get(target, prop) {
+        //         console.log('intercepted!')
+        //         return target[prop]
+        //     }
+        // }
+
+        // const proxy = new Proxy(dinner, handler)
+        // console.log(proxy.meal)
+
+        // // intercepted!
+        // // tacos
+
+        // const dinner = {
+        //     meal: 'tacos'
+        // }
+
+        // const handler = {
+        //     get(target, prop, receiver) {
+        //         return Reflect.get(...arguments)
+        //     }
+        // }
+
+        // const proxy = new Proxy(dinner, handler)
+        // console.log(proxy.meal)
+
+        // // intercepted!
+        // // tacos
+
+        // const dinner = {
+        //     meal: 'tacos'
+        // }
+
+        // const handler = {
+        //     get(target, prop, receiver) {
+        //         // track(target, prop)
+        //         return Reflect.get(...arguments)
+        //     }
+        // }
+
+        // const proxy = new Proxy(dinner, handler)
+        // console.log(proxy.meal)
+
+        // // intercepted!
+        // // tacos
+
+        const dinner = {
+            meal: 'tacos'
+        }
+
+        const handler = {
+            get(target, prop, receiver) {
+                // track(target, prop)
+                return Reflect.get(...arguments)
+            },
+            set(target, key, value, receiver) {
+                // trigger(target, key)
+                return Reflect.set(...arguments)
+            }
+        }
+
+        const proxy = new Proxy(dinner, handler)
+        console.log(proxy.meal)
+
+        // intercepted!
+        // tacos
+
+        // 在使用composition API显式创建反应对象时，最佳实践是永远不要保留对原始原始对象的引用，而只能使用反应版本
+    </script>
+</body>
+
+</html>

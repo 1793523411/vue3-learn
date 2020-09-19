@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Date-picker component with a non-prop attribute -->
+        <!-- <date-picker data-status="activated" @change="submitChange"></date-picker> -->
+
+        <!-- Rendered date-picker component -->
+        <!-- <div class="date-picker" data-status="activated">
+            <input type="date" />
+        </div>
+        <div id="date-picker" class="demo">
+            <date-picker @change="showChange"></date-picker>
+        </div> -->
+
+        <date-picker data-status="activated"></date-picker>
+
+        <!-- Rendered date-picker component -->
+        <div class="date-picker">
+            <input type="datetime" data-status="activated" />
+        </div>
+
+        <custom-layout id="custom-layout" @click="changeValue"></custom-layout>
+    </div>
+    <script>
+        const app = Vue.createApp({
+            data() {
+                return {
+                    date: ''
+                }
+            },
+            methods: {
+                submitChange() {
+                    alert('111')
+                },
+                showChange(event) {
+                    console.log(event.target.value) // will log a value of the selected option
+                }
+            },
+        })
+        // app.component('date-picker', {
+        //     template: `
+        //         <div class="date-picker">
+        //         <input type="date" />
+        //         </div>
+        //     `,
+        //     created() {
+        //         console.log(this.$attrs) // { onChange: () => {}  }
+        //     }
+        // })
+
+        // app.component('date-picker', {
+        //     template: `
+        //         <select>
+        //         <option value="1">Yesterday</option>
+        //         <option value="2">Today</option>
+        //         <option value="3">Tomorrow</option>
+        //         </select>
+        //     `
+        // })
+
+        // 如果您不希望组件自动继承属性，则可以inheritAttrs: false在组件的选项中进行设置。
+        // 使用此新配置，我们的data-status属性将应用于我们的input元素！
+        app.component('date-picker', {
+            inheritAttrs: false,
+            template: `
+                <div class="date-picker">
+                <input type="datetime" v-bind="$attrs" />
+                </div>
+            `
+        })
+
+        // This will raise a warning
+        // app.component('custom-layout', {
+        //     template: `
+        //         <header>...</header>
+        //         <main>...</main>
+        //         <footer>...</footer>
+        //     `
+        // })
+
+        // No warnings, $attrs are passed to <main> element
+        app.component('custom-layout', {
+            template: `
+                <header>...</header>
+                <main v-bind="$attrs">...</main>
+                <footer>...</footer>
+            `
+        })
+        app.mount('#app')
+    </script>
+</body>
+
+</html>
