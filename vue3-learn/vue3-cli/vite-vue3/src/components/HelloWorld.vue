@@ -1,18 +1,22 @@
 <template>
-  <h1>{{ msg }}</h1>
-  <button @click="count++">count is: {{ count }}</button>
-  <p>Edit <code>components/HelloWorld.vue</code> to test hot module replacement.</p>
+  <button @click="increment">
+    Count is: {{ state.count }}, double is: {{ state.double }}
+  </button>
 </template>
-
 <script>
+import { reactive, computed } from 'vue'
 export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
-  },
-  data() {
+  setup() {
+    const state = reactive({
+      count: 0,
+      double: computed(() => state.count * 2)
+    })
+    function increment() {
+      state.count++
+    }
     return {
-      count: 0
+      state,
+      increment
     }
   }
 }
