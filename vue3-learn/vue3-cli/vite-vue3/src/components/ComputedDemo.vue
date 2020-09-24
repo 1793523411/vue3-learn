@@ -1,8 +1,8 @@
 <template>
-<div>
-    {{ plusOne }}
-</div>
-<button @click="plus">plus</button>
+  <div>
+    <!--{{ plusOne }}-->
+  </div>
+  <!--<button @click="plus">plus</button>-->
 </template>
 
 <script>
@@ -24,52 +24,51 @@
 //         console.log(count.value); // 0
 //     },
 // };
-import {
-    ref,
-    computed
-} from "vue";
-import {
-    effect
-} from '@vue/reactivity'
+import { ref, computed, watchEffect } from "vue";
+import { effect } from "@vue/reactivity";
 export default {
-    setup() {
-        // const count = ref(0);
-        // const plusOne = computed(() => {
-        //     return count.value + 1;
-        // });
+  setup() {
+    // const count = ref(0);
+    // const plusOne = computed(() => {
+    //     return count.value + 1;
+    // });
 
-        // function plus() {
-        //     count.value++;
-        // }
+    // function plus() {
+    //     count.value++;
+    // }
 
-        // const count = ref(0);
-        // const plusOne = computed(() => {
-        //     return count.value + 1;
-        // });
-        // const plusTwo = computed(() => {
-        //     return plusOne.value + 1;
-        // });
-        // console.log(plusTwo.value);
+    // const count = ref(0);
+    // const plusOne = computed(() => {
+    //     return count.value + 1;
+    // });
+    // const plusTwo = computed(() => {
+    //     return plusOne.value + 1;
+    // });
+    // console.log(plusTwo.value);
 
-        const count = ref(0);
-        const plusOne = computed(() => {
-            return count.value + 1;
-        });
-        effect(() => {
-            console.log(plusOne.value + count.value);
-        });
+    // const count = ref(0);
+    // const plusOne = computed(() => {
+    //     return count.value + 1;
+    // });
+    // effect(() => {
+    //     console.log(plusOne.value + count.value);
+    // });
 
-        function plus() {
-            count.value++;
-        }
-        // plus();
+    // function plus() {
+    //     count.value++;
+    // }
+    // plus();
 
-        return {
-            plusOne,
-            //   plusTwo,
-            plus,
-        };
-    },
+    const count = ref(0);
+    watchEffect(() => console.log('*',count.value));
+    count.value++;
+
+    return {
+    //   plusOne,
+      //   plusTwo,
+    //   plus,
+    };
+  },
 };
 </script>
 
