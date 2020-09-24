@@ -5,6 +5,7 @@
     <Demo />
     <Demo02 @toggle="toggle" :msg="msg" />
     <clean />
+    <ComputedDemo />
 </div>
 </template>
 
@@ -13,6 +14,7 @@ import HelloWorld from "./components/HelloWorld.vue";
 import Demo from "./components/Demo.vue";
 import Demo02 from "./components/Demo02.vue";
 import Clean from "./components/Clean.vue";
+import ComputedDemo from './components/ComputedDemo.vue'
 import {
     ref
 } from 'vue'
@@ -22,7 +24,8 @@ export default {
         HelloWorld,
         Demo,
         Demo02,
-        Clean
+        Clean,
+        ComputedDemo
     },
     setup() {
         const msg = ref('Hello World')

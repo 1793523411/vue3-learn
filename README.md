@@ -456,10 +456,52 @@ effect 内部通过执行 createReactiveEffect 函数去创建一个新的 effec
 
 ref 的实现:函数首先处理了嵌套 ref 的情况，如果传入的 rawValue 也是 ref，那么直接返回,接着对 rawValue 做了一层转换，如果 rawValue 是对象或者数组类型，那么把它转换成一个 reactive 对象,最后定义一个对 value 属性做 getter 和 setter 劫持的对象并返回，get 部分就是执行 track 函数做依赖收集然后返回它的值；set 部分就是设置新值并且执行 trigger 函数派发通知
 
-
 其实 Vue.js 3.0 在响应式的实现思路和 Vue.js 2.x 差别并不大，主要就是 劫持数据的方式改成用 **Proxy 实现** ， 以及收集的依赖由 watcher 实例变成了组件**副作用渲染函数**
 
 ## 计算属性：计算属性比普通函数好在哪里
 
+### 计算属性 API： computed
 
+使用看代码
 
+我们现在已经知道了 computed API 的两种使用方式了，接下来就看看它是怎样实现的，computed 函数的流程主要做了三件事情：标准化参数，创建副作用函数和创建 computed 对象。我们来详细分析一下这几个步骤
+
+首先是标准化参数。computed 函数接受两种类型的参数，一个是 getter 函数，一个是拥有 getter 和 setter 函数的对象，通过判断参数的类型，我们初始化了函数内部定义的 getter 和 setter 函数
+
+接着是创建副作用函数 runner。computed 内部通过 effect 创建了一个副作用函数，它是对 getter 函数做的一层封装，另外我们这里要注意第二个参数，也就是 effect 函数的配置对象。其中 lazy 为 true 表示 effect 函数返回的 runner 并不会立即执行；computed 为 true 用于表示这是一个 computed effect，用于 trigger 阶段的优先级排序，我们稍后会分析；scheduler 表示它的调度运行的方式，我们也稍后分析
+
+最后是创建 computed 对象并返回，这个对象也拥有 getter 和 setter 函数。当 computed 对象被访问的时候会触发 getter，然后会判断是否 dirty，如果是就执行 runner，然后做依赖收集；当我们直接设置 computed 对象时会触发 setter，即执行 computed 函数内部定义的 setter 函数
+
+### 计算属性的运行机制
+
+computed 函数的逻辑会有一点绕，不过不要紧，我们可以结合一个应用 computed 计算属性的例子，来理解整个计算属性的运行机制。分析之前我们需要记住 computed 内部两个重要的变量，第一个 dirty 表示一个计算属性的值是否是“脏的”，用来判断需不需要重新计算，第二个 value 表示计算属性每次计算后的结果
+
+computed API 内部创建副作用函数时，已经配置了 scheduler 函数
+```js
+scheduler: () => { 
+  if (!dirty) { 
+    dirty = true 
+    // 派发通知，通知运行访问该计算属性的 activeEffect 
+    trigger(computed, "set" /* SET */, 'value') 
+  } 
+}
+```
+它并没有对计算属性求新值，而仅仅是把 dirty 设置为 true，再执行 trigger(computed, "set" , 'value'),触发组件的重新渲染
+
+通过以上分析，我们可以看出 computed 计算属性有两个特点：
+
++ 延时计算，只有当我们访问计算属性的时候，它才会真正运行 computed getter 函数计算；
+
++ 缓存，它的内部会缓存上次的计算结果 value，而且只有 dirty 为 true 时才会重新计算。如果访问计算属性时 dirty 为 false，那么直接返回这个 value。
+
+和单纯使用普通函数相比，计算属性的优势是：只要依赖不变化，就可以使用缓存的 value 而不用每次在渲染组件的时候都执行函数去计算，这是典型的空间换时间的优化思想
+
+### 嵌套计算属性
+
+计算属性也支持嵌套,得益于 computed 这种巧妙的设计，无论嵌套多少层计算属性都可以正常工作。
+
+### 计算属性的执行顺序
+
+我们曾提到计算属性内部创建副作用函数的时候会配置 computed 为 true，标识这是一个 computed effect，用于在 trigger 阶段的优先级排序。我们来回顾一下 trigger 函数执行 effects 的过程,分析 trigger 函数的时候，为了方便你理解主干逻辑，我省略了 computedRunners 的分支逻辑。实际上，在添加待运行的 effects 的时候，我们会判断每一个 effect 是不是一个 computed effect，如果是的话会添加到 computedRunners 中，在后面运行的时候会优先执行 computedRunners，然后再执行普通的 effects
+
+**computed runner 和 effect**
