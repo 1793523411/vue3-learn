@@ -1072,7 +1072,6 @@ Vue.js 内部大概内置了八种转换函数，分别处理指令、表达式�
 
 首先，我们来看一下 Element 节点转换函数的实现,可以看到，只有当 AST 节点是组件或者普通元素节点时，才会返回一个退出函数，而且它会在该节点的子节点逻辑处理完毕后执行,分析这个退出函数前，我们需要知道节点函数的转换目标，即创建一个实现 VNodeCall 接口的代码生成节点，也就是说，生成这个代码生成节点后，后续的代码生成阶段可以根据这个节点对象生成目标代码,知道了这个目标，我们再去理解 transformElement 函数的实现就不难了
 
-
 首先，判断这个节点是不是一个 Block 节点。为了运行时的更新优化，Vue.js 3.0 设计了一个 Block tree 的概念。Block tree 是一个将模版基于动态节点指令切割的嵌套区块，每个区块只需要以一个 Array 来追踪自身包含的动态节点。借助 Block tree，Vue.js 将 vnode 更新性能由与模版整体大小相关提升为与动态内容的数量相关，极大优化了 diff 的效率，模板的动静比越大，这个优化就会越明显,因此在编译阶段，我们需要找出哪些节点可以构成一个 Block，其中动态组件、svg、foreignObject 标签以及动态绑定的 prop 的节点都被视作一个 Block
 
 其次，是处理节点的 props。这个过程主要是从 AST 节点的 props 对象中进一步解析出指令 vnodeDirectives、动态属性 dynamicPropNames，以及更新标识 patchFlag。patchFlag 主要用于标识节点更新的类型，在组件更新的优化中会用到
@@ -1085,7 +1084,7 @@ Vue.js 内部大概内置了八种转换函数，分别处理指令、表达式�
 
 ### 表达式节点转换函数
 
-接下来，我们来看一下表达式节点转换函数的实现transformExpression ：由于表达式本身不会再有子节点，所以它也不需要退出函数，直接在进入函数时做转理即可,需要注意的是，只有在 Node.js 环境下的编译或者是 Web 端的非生产环境下才会执行 transformExpression,.transformExpression 主要做的事情就是转换插值和元素指令中的动态表达式，把简单的表达式对象转换成复合表达式对象，内部主要是通过 processExpression 函数完成。举个例子，比如这个模板：{{ msg + test }}，它执行 parse 后生成的表达式节点 node.content 值为一个简单的表达式对象
+接下来，我们来看一下表达式节点转换函数的实现 transformExpression ：由于表达式本身不会再有子节点，所以它也不需要退出函数，直接在进入函数时做转理即可,需要注意的是，只有在 Node.js 环境下的编译或者是 Web 端的非生产环境下才会执行 transformExpression,.transformExpression 主要做的事情就是转换插值和元素指令中的动态表达式，把简单的表达式对象转换成复合表达式对象，内部主要是通过 processExpression 函数完成。举个例子，比如这个模板：{{ msg + test }}，它执行 parse 后生成的表达式节点 node.content 值为一个简单的表达式对象
 
 ```js
 {
@@ -1097,6 +1096,7 @@ Vue.js 内部大概内置了八种转换函数，分别处理指令、表达式�
 ```
 
 经过 processExpression 处理后，node.content 的值变成了一个复合表达式对象
+
 ```js
 {
   "type": 8,
@@ -1119,9 +1119,9 @@ Vue.js 内部大概内置了八种转换函数，分别处理指令、表达式�
 }
 ```
 
-这里，我们重点关注对象中的 children 属性，它是一个长度为 3 的数组，其实就是把表达式msg + test拆成了三部分，其中变量 msg 和 test 对应都加上了前缀 _ctx,那么为什么需要加这个前缀呢？我们就要想到模板中引用的的 msg 和 test 对象最终都是在组件实例中访问的，但为了书写模板方便，Vue.js 并没有让我们在模板中手动加组件实例的前缀，例如：{{ this.msg + this.test }}，这样写起来就会不够方便，但如果用 JSX 写的话，通常要手动写 this
+这里，我们重点关注对象中的 children 属性，它是一个长度为 3 的数组，其实就是把表达式 msg + test 拆成了三部分，其中变量 msg 和 test 对应都加上了前缀 \_ctx,那么为什么需要加这个前缀呢？我们就要想到模板中引用的的 msg 和 test 对象最终都是在组件实例中访问的，但为了书写模板方便，Vue.js 并没有让我们在模板中手动加组件实例的前缀，例如：{{ this.msg + this.test }}，这样写起来就会不够方便，但如果用 JSX 写的话，通常要手动写 this
 
-你可能会有疑问，为什么 Vue.js 2.x 编译的结果没有 _ctx 前缀呢？这是因为 Vue.js 2.x 的编译结果使用了”黑魔法“ with，比如上述模板，在 Vue.js 2.x 最终编译的结果：with(this){return _s(msg + test)}。它利用 with 的特性动态去 this 中查找 msg 和 test 属性，所以不需要手动加前缀。但是，Vue.js 3.0 在 Node.js 端的编译结果舍弃了 with，它会在 processExpression 过程中对表达式动态分析，给该加前缀的地方加上前缀
+你可能会有疑问，为什么 Vue.js 2.x 编译的结果没有 \_ctx 前缀呢？这是因为 Vue.js 2.x 的编译结果使用了”黑魔法“ with，比如上述模板，在 Vue.js 2.x 最终编译的结果：with(this){return \_s(msg + test)}。它利用 with 的特性动态去 this 中查找 msg 和 test 属性，所以不需要手动加前缀。但是，Vue.js 3.0 在 Node.js 端的编译结果舍弃了 with，它会在 processExpression 过程中对表达式动态分析，给该加前缀的地方加上前缀
 
 ```txt
 processExpression 的详细实现我们不会分析，但你需要知道，这个过程肯定有一定的成本，因为它内部依赖了 @babel/parser 库去解析表达式生成 AST 节点，并依赖了 estree-walker 库去遍历这个 AST 节点，然后对节点分析去判断是否需要加前缀，接着对 AST 节点修改，最终转换生成新的表达式对象。
@@ -1166,20 +1166,200 @@ v-if 指令用于条件性地渲染一块内容，显然 AST 节点对于最终�
 createRootCodegen 完成之后，接着把 transform 上下文在转换 AST 节点过程中创建的一些变量赋值给 root 节点对应的属性，在这里可以看一下这些属性
 
 ```js
-root.helpers = [...context.helpers]
-root.components = [...context.components]
-root.directives = [...context.directives]
-root.imports = [...context.imports]
-root.hoists = context.hoists
-root.temps = context.temps
-root.cached = context.cached
+root.helpers = [...context.helpers];
+root.components = [...context.components];
+root.directives = [...context.directives];
+root.imports = [...context.imports];
+root.hoists = context.hoists;
+root.temps = context.temps;
+root.cached = context.cached;
 ```
+
 这样后续在代码生成节点时，就可以通过 root 这个根节点访问到这些变量了。
 
 **如果说 parse 阶段是一个词法分析过程，构造基础的 AST 节点对象，那么 transform 节点就是语法分析阶段，把 AST 节点做一层转换，构造出语义化更强，信息更加丰富的 codegenCode，它在后续的代码生成阶段起着非常重要的作用。**
 
->我们已经知道静态提升的好处是，针对静态节点不用每次在 render 阶段都执行一次 createVNode 创建 vnode 对象，但它有没有成本呢？:会出现大量的dom节点出现在在内存中，但是没有在页面上的情况，占用缓存，而且编译变慢了
+> 我们已经知道静态提升的好处是，针对静态节点不用每次在 render 阶段都执行一次 createVNode 创建 vnode 对象，但它有没有成本呢？:会出现大量的 dom 节点出现在在内存中，但是没有在页面上的情况，占用缓存，而且编译变慢了
 
-## 
+## 生成代码：AST 如何生成可运行的代码
 
+我们分析了 AST 节点转换的过程，也知道了 AST 节点转换的作用是通过语法分析，创建了语义和信息更加丰富的代码生成节点 codegenNode，便于后续生成代码，那么这，我们就来分析整个编译的过程的最后一步——代码生成的实现原理
 
+```html
+<div class="app">
+  <hello v-if="flag"></hello>
+  <div v-else>
+    <p>hello {{ msg + test }}</p>
+    <p>static</p>
+    <p>static</p>
+  </div>
+</div>
+```
+
+代码生成的结果是和编译配置相关的,我们分析的编译配置是：mode 为 module，prefixIdentifiers 开启，hoistStatic 开启，其他配置均不开启
+
+示例的模板是如何转换生成这样的代码的？在 AST 转换后，会执行 generate 函数生成代码,generate 函数的输入就是转换后的 AST 根节点,generate 主要做五件事情：创建代码生成上下文，生成预设代码，生成渲染函数，生成资源声明代码，以及生成创建 VNode 树的表达式。接下来，我们就依次详细分析这几个流程。
+
+### 创建代码生成上下文
+
+首先，是通过执行 createCodegenContext 创建代码生成上下文,这个上下文对象 context 维护了 generate 过程的一些配置，比如 mode、prefixIdentifiers；也维护了 generate 过程的一些状态数据，比如当前生成的代码 code，当前生成代码的缩进 indentLevel 等,此外，context 还包含了在 generate 过程中可能会调用的一些辅助函数，接下来我会介绍几个常用的方法，它们会在整个代码生成节点过程中经常被用到。
+
+- push(code)，就是在当前的代码 context.code 后追加 code 来更新它的值。
+- indent()，它的作用就是增加代码的缩进，它会让上下文维护的代码缩进 context.indentLevel 加 1，内部会执行 newline 方法，添加一个换行符，以及两倍 indentLevel 对应的空格来表示缩进的长度。
+- deindent()，和 indent 相反，它会减少代码的缩进，让上下文维护的代码缩进 context.indentLevel 减 1，在内部会执行 newline 方法去添加一个换行符，并减少两倍 indentLevel 对应的空格的缩进长度。
+
+上下文创建完毕后，接下来就到了真正的代码生成阶段,我们先来看生成预设代码。
+
+### 生成预设代码
+
+因为 mode 是 module，所以会执行 genModulePreamble 生成预设代码,下面我们结合前面的示例来分析这个过程，此时 genScopeId 为 false，所以相关逻辑我们可以不看。ast.helpers 是在 transform 阶段通过 context.helper 方法添加的，它的值如下
+
+```js
+[
+  Symbol(resolveComponent),
+  Symbol(createVNode),
+  Symbol(createCommentVNode),
+  Symbol(toDisplayString),
+  Symbol(openBlock),
+  Symbol(createBlock),
+];
+```
+
+ast.helpers 存储了 Symbol 对象的数组，我们可以从 helperNameMap 中找到每个 Symbol 对象对应的字符串
+
+通过生成的代码，我们可以直观地感受到，这里就是从 Vue 中引入了一些辅助方法，那么为什么需要引入这些辅助方法呢，这就和 Vue.js 3.0 的设计有关了
+
+在 Vue.js 2.x 中，创建 VNode 的方法比如 \$createElement、\_c 这些都是挂载在组件的实例上，在生成渲染函数的时候，直接从组件实例 vm 中访问这些方法即可,而到了 Vue.js 3.0，创建 VNode 的方法 createVNode 是直接通过模块的方式导出，其它方法比如 resolveComponent、openBlock ，都是类似的，所以我们首先需要生成这些 import 声明的预设代码。
+
+我们接着往下看，ssrHelpers 是 undefined，imports 的数组长度为空，genScopeId 为 false，所以这些内部逻辑都不会执行，接着执行 genHoists 生成静态提升的相关代码
+
+首先通过执行 newline 生成一个空行，然后遍历 hoists 数组，生成静态提升变量定义的方法,这里，hoists 数组的长度为 4，前两个都是 JavaScript 对象表达式节点，后两个是 VNodeCall 节点，通过 genNode 我们可以把这些节点生成对应的代码
+
+可以看到，除了从 Vue 中导入辅助方法，我们还创建了静态提升的变量。
+
+我们回到 genModulePreamble，接着会执行 newline()和 push(export )，非常好理解，也就是添加了一个空行和 export 字符串
+
+至此，预设代码生成完毕
+
+### 生成渲染函数
+
+接下来，就是生成渲染函数了，我们回到 generate 函数,我们创建了 render 的函数声明，接下来的代码都是在生成 render 的函数体
+
+### 生成资源声明代码
+
+在 render 函数体的内部，我们首先要生成资源声明代码,在我们的示例中，directives 数组长度为 0，temps 的值是 0，所以自定义指令和临时变量代码生成的相关逻辑跳过，而这里 components 的值是`["hello"]`,接着就通过 genAssets 去生成自定义组件声明代码,这里的 helper 函数就是从前面提到的 helperNameMap 中查找对应的字符串，对于 component，返回的就是 resolveComponent。接着会遍历 assets 数组，生成自定义组件声明代码，在这个过程中，它们会把变量通过 toValidAssetId 进行一层包装,比如 hello 组件，执行 toValidAssetId 就变成了 \_component_hello。
+
+---
+
+我们已经知道了在 AST 转换后，会执行 generate 函数生成代码，而 generate 主要做五件事情：创建代码生成上下文，生成预设代码，生成渲染函数，生成资源声明代码，以及生成创建 VNode 树的表达式。我们继续分析，来看生成创建 VNode 树的表达式的过程。
+
+### 生成创建 VNode 树的表达式
+
+前面我们在转换过程中给根节点添加了 codegenNode，所以接下来就是通过 genNode 生成创建 VNode 树的表达式,genNode 主要的思路就是根据不同的节点类型，生成不同的代码，这里有十几种情况，我就不全部讲一遍了，仍然是以我们的示例为主，来分析它们的实现，没有分析到的分支我的建议是大致了解即可，未来如果遇到相关的场景，你再来详细看它们的实现也不迟,现在，我们来看一下根节点 codegenNode 的值,由于根节点的 codegenNode 类型是 13，也就是一个 VNodeCall，所以会执行 genVNodeCall 生成创建 VNode 节点的表达式代码,根据我们的示例来看，directives 没定义，不用处理，isBlock 为 true，disableTracking 为 false，那么生成如下打开 Block 的代码
+
+```js
+import { resolveComponent as _resolveComponent, createVNode as _createVNode, createCommentVNode as _createCommentVNode, toDisplayString as _toDisplayString, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+const _hoisted_1 = { class: "app" }
+const _hoisted_2 = { key: 1 }
+const _hoisted_3 = /*#__PURE__*/_createVNode("p", null, "static", -1 /* HOISTED */)
+const _hoisted_4 = /*#__PURE__*/_createVNode("p", null, "static", -1 /* HOISTED */)
+export function render(_ctx, _cache) {
+  const _component_hello = _resolveComponent("hello")
+  return (_openBlock()
+
+```
+
+接着往下看，会判断 pure 是否为 true，如果是则生成相关的注释，虽然这里的 pure 为 false，但是之前我们在生成静态提升变量相关代码的时候 pure 为 true，所以生成了注释代码 /#PURE/
+
+生成了一个\_createBlock 的函数调用后，下面就需要生成函数的参数`genNodeList(genNullableArgs([tag, props, children, patchFlag, dynamicProps]), context)`,依据代码的执行顺序，我们先来看 genNullableArgs 的实现,这个方法很简单，就是倒序遍历参数数组，找到第一个不为空的参数，然后返回该参数前面的所有参数构成的新数组,genNullableArgs 传入的参数数组依次是 tag、props、children、patchFlag 和 dynamicProps，对于我们的示例而言，此时 patchFlag 和 dynamicProps 为 undefined，所以 genNullableArgs 返回的是一个[tag, props, children]这样的数组。其实这是很好理解的，对于一个 vnode 节点而言，构成它的主要几个部分就是节点的标签 tag，属性 props 以及子节点 children，我们的目标就是生成类似下面的代码：\_createBlock(tag, props, children)。因此接下来，我们再通过 genNodeList 来生成参数相关的代码，来看一下它的实现
+
+genNodeList 就是通过遍历 nodes，拿到每一个 node，然后判断 node 的类型，如果 node 是字符串，就直接添加到代码中；如果是一个数组，则执行 genNodeListAsArray 生成数组形式的代码，否则是一个对象，则递归执行 genNode 生成节点代码。genNodeListAsArray 主要是把一个 node 列表生成一个类似数组形式的代码，所以前后会添加中括号，并且判断是否要生成多行代码，如果是多行，前后还需要加减代码的缩进，而中间部分的代码，则继续递归调用 genNodeList 生成
+
+genNode 遇到条件表达式节点会执行 genConditionalExpression,genConditionalExpression 的主要目的就是生成条件表达式代码，所以首先它会生成逻辑测试的代码,对于示例，我们这里是一个简单表达式节点,接下来就是生成一些换行和缩进，紧接着生成主逻辑代码，也就是把 consequent 这个 vnode 调用节点通过 genNode 转换生成代码，这又是一个递归过程,接下来就是生成备选逻辑的代码，即把 alternate 这个 vnode 调用节点通过 genNode 转换生成代码，同样内部的细节我就不赘述了.需要注意的是，alternate 对应的节点的 isBlock 属性是 true，所以会生成创建 Block 相关的代码,接下来我们回到 genNodeListAsArray 函数，处理完 children，那么下面就会减少缩进，并添加闭合的中括号,genNodeListAsArray 处理完子节点后，回到 genNodeList，发现所有 nodes 也处理完了，则回到 genVNodeCall 函数，接下来的逻辑就是补齐函数调用的右括号,那么至此，根节点 vnode 树的表达式就创建好了。我们再回到 generate 函数，接下来就需要添加右括号 “}” 来闭合渲染函数
+
+整体流程还是很容易理解的，主要就是一个递归的思想，遇到不同类型的节点，执行相应的代码生成函数生成代码即可,节点生成代码的所需的信息可以从节点的属性中获取，这完全得益于前面 transform 的语法分析阶段生成的 codegenNode，根据这些信息就能很容易地生成对应的代码了
+
+至此，我们已经了解了模板的编译到代码的全部流程。相比 Vue.js 2.x，Vue.js 3.0 在编译阶段设计了 Block 的概念，我们上述示例编译出来的代码就是通过创建一个 Block 来创建对应的 vnode。那么，这个 Block 在运行时是怎么玩的呢？为什么它会对性能优化起到很大的作用呢？接下来我们就来分析它背后的实现原理。
+
+### 运行时优化
+
+首先，我们来看一下 openBlock 的实现,Vue.js 3.0 在运行时设计了一个 blockStack 和 currentBlock，其中 blockStack 表示一个 Block Tree，因为要考虑嵌套 Block 的情况，而currentBlock 表示当前的 Block,openBlock 的实现很简单，往当前 blockStack push 一个新的 Block，作为 currentBlock。那么设计 Block 的目的是什么呢？主要就是收集动态的 vnode 的节点，这样才能在 patch 阶段只比对这些动态 vnode 节点，避免不必要的静态节点的比对，优化了性能。那么动态 vnode 节点是什么时候被收集的呢？其实是在 createVNode 阶段
+
+```js
+function createVNode(type, props = null
+,children = null) {
+  // 处理 props 相关逻辑，标准化 class 和 style
+  // 对 vnode 类型信息编码 
+  // 创建 vnode 对象
+  // 标准化子节点，把不同数据类型的 children 转成数组或者文本类型。
+  // 添加动态 vnode 节点到 currentBlock 中
+  if (shouldTrack > 0 &&
+    !isBlockNode &&
+    currentBlock &&
+    patchFlag !== 32 /* HYDRATE_EVENTS */ &&
+    (patchFlag > 0 ||
+      shapeFlag & 128 /* SUSPENSE */ ||
+      shapeFlag & 64 /* TELEPORT */ ||
+      shapeFlag & 4 /* STATEFUL_COMPONENT */ ||
+      shapeFlag & 2 /* FUNCTIONAL_COMPONENT */)) {
+    currentBlock.push(vnode);
+  }
+  
+  return vnode
+}
+```
+注释中写的前面几个过程，我们在之前的章节已经讲过了，我们来看函数的最后，这里会判断 vnode 是不是一个动态节点，如果是则把它添加到 currentBlock 中，这就是动态 vnode 节点的收集过程
+
+我们接着来看 createBlock 的实现
+```js
+function createBlock(type, props, children, patchFlag, dynamicProps) {
+  const vnode = createVNode(type, props, children, patchFlag, dynamicProps, true /* isBlock: 阻止这个 block 收集自身 */)
+  // 在 vnode 上保留当前 Block 收集的动态子节点
+  vnode.dynamicChildren = currentBlock || EMPTY_ARR
+  blockStack.pop()
+  // 当前 Block 恢复到父 Block
+  currentBlock = blockStack[blockStack.length - 1] || null
+  // 节点本身作为父 Block 收集的子节点
+  if (currentBlock) {
+    currentBlock.push(vnode)
+  }
+  return vnode
+}
+
+```
+
+这时候你可能会好奇，为什么要设计 openBlock 和 createBlock 两个函数呢?为什么不把 openBlock 和 createBlock 放在一个函数中执行呢
+
+```js
+function render() {
+  return (openBlock(),createBlock('div', null, [/*...*/]))
+}
+```
+
+```js
+function render() {
+  return (createBlock('div', null, [/*...*/]))
+}
+function createBlock(type, props, children, patchFlag, dynamicProps) {
+  openBlock()
+  // 创建 vnode
+  const vnode = createVNode(type, props, children, patchFlag, dynamicProps, true)
+  // ...  
+  return vnode
+}
+
+```
+
+这样是不行的！其中原因其实很简单，createBlock 函数的第三个参数是 children，这些 children 中的元素也是经过 createVNode 创建的，显然一个函数的调用需要先去执行参数的计算，也就是优先去创建子节点的 vnode，然后才会执行父节点的 createBlock 或者是 createVNode,所以在父节点的 createBlock 函数执行前，子节点就已经通过 createVNode 创建了对应的 vnode ，如果把 openBlock 的逻辑放在了 createBlock 中，就相当于在子节点创建后才创建 currentBlock，这样就不能正确地收集子节点中的动态 vnode 了。再回到 createBlock 函数内部，这个时候你要明白动态子节点已经被收集到 currentBlock 中了。函数首先会执行 createVNode 创建一个 vnode 节点，注意最后一个参数是 true，这表明它是一个 Block node，所以就不会把自身当作一个动态 vnode 收集到 currentBlock 中。接着把收集动态子节点的 currentBlock 保留到当前的 Block vnode 的 dynamicChildren 中，为后续 patch 过程访问这些动态子节点所用。最后把当前 Block 恢复到父 Block，如果父 Block 存在的话，则把当前这个 Block node 作为动态节点添加到父 Block 中。
+
+Block Tree 的构造过程我们搞清楚了，那么接下来我们就来看它在 patch 阶段具体是如何工作的。
+
+我们之前分析过，在 patch 阶段更新节点元素的时候，会执行 patchElement 函数,我们在前面组件更新的章节分析过这个流程，在分析子节点更新的部分，当时并没有考虑到优化的场景，所以只分析了全量比对更新的场景,而实际上，如果这个 vnode 是一个 Block vnode，那么我们不用去通过 patchChildren 全量比对，只需要通过 patchBlockChildren 去比对并更新 Block 中的动态子节点即可。patchBlockChildren 的实现很简单，遍历新的动态子节点数组，拿到对应的新旧动态子节点，并执行 patch 更新子节点即可。**这样一来，更新的复杂度就变成和动态节点的数量正相关，而不与模板大小正相关，如果一个模板的动静比越低，那么性能优化的效果就越明显**
+
+通过学习,应该了解了 AST 是如何生成可运行的代码，也应该明白了 Vue.js 3.0 是如何通过 Block 的方式实现了运行时组件更新的性能优化
+
+## 实用特性：探索更多实用特性背后的原理 
+
+Vue.js 除了核心的组件化和响应式之外，还提供了很多非常实用的特性供我们使用，比如组件的 props、slot、directive 等特性，它们让我们的开发更加灵活。由于我们平时工作中会经常接触到这些特性，除了熟练运用它们之外，我建议你把它们底层的实现原理搞清楚，这样你就能更加自如地应用，并且在出现 bug 的时候能第一时间定位到问题。
+
+### 
