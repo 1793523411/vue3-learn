@@ -1283,17 +1283,17 @@ genNode 遇到条件表达式节点会执行 genConditionalExpression,genConditi
 
 ### 运行时优化
 
-首先，我们来看一下 openBlock 的实现,Vue.js 3.0 在运行时设计了一个 blockStack 和 currentBlock，其中 blockStack 表示一个 Block Tree，因为要考虑嵌套 Block 的情况，而currentBlock 表示当前的 Block,openBlock 的实现很简单，往当前 blockStack push 一个新的 Block，作为 currentBlock。那么设计 Block 的目的是什么呢？主要就是收集动态的 vnode 的节点，这样才能在 patch 阶段只比对这些动态 vnode 节点，避免不必要的静态节点的比对，优化了性能。那么动态 vnode 节点是什么时候被收集的呢？其实是在 createVNode 阶段
+首先，我们来看一下 openBlock 的实现,Vue.js 3.0 在运行时设计了一个 blockStack 和 currentBlock，其中 blockStack 表示一个 Block Tree，因为要考虑嵌套 Block 的情况，而 currentBlock 表示当前的 Block,openBlock 的实现很简单，往当前 blockStack push 一个新的 Block，作为 currentBlock。那么设计 Block 的目的是什么呢？主要就是收集动态的 vnode 的节点，这样才能在 patch 阶段只比对这些动态 vnode 节点，避免不必要的静态节点的比对，优化了性能。那么动态 vnode 节点是什么时候被收集的呢？其实是在 createVNode 阶段
 
 ```js
-function createVNode(type, props = null
-,children = null) {
+function createVNode(type, props = null, children = null) {
   // 处理 props 相关逻辑，标准化 class 和 style
-  // 对 vnode 类型信息编码 
+  // 对 vnode 类型信息编码
   // 创建 vnode 对象
   // 标准化子节点，把不同数据类型的 children 转成数组或者文本类型。
   // 添加动态 vnode 节点到 currentBlock 中
-  if (shouldTrack > 0 &&
+  if (
+    shouldTrack > 0 &&
     !isBlockNode &&
     currentBlock &&
     patchFlag !== 32 /* HYDRATE_EVENTS */ &&
@@ -1301,53 +1301,75 @@ function createVNode(type, props = null
       shapeFlag & 128 /* SUSPENSE */ ||
       shapeFlag & 64 /* TELEPORT */ ||
       shapeFlag & 4 /* STATEFUL_COMPONENT */ ||
-      shapeFlag & 2 /* FUNCTIONAL_COMPONENT */)) {
+      shapeFlag & 2) /* FUNCTIONAL_COMPONENT */
+  ) {
     currentBlock.push(vnode);
   }
-  
-  return vnode
+
+  return vnode;
 }
 ```
+
 注释中写的前面几个过程，我们在之前的章节已经讲过了，我们来看函数的最后，这里会判断 vnode 是不是一个动态节点，如果是则把它添加到 currentBlock 中，这就是动态 vnode 节点的收集过程
 
 我们接着来看 createBlock 的实现
+
 ```js
 function createBlock(type, props, children, patchFlag, dynamicProps) {
-  const vnode = createVNode(type, props, children, patchFlag, dynamicProps, true /* isBlock: 阻止这个 block 收集自身 */)
+  const vnode = createVNode(
+    type,
+    props,
+    children,
+    patchFlag,
+    dynamicProps,
+    true /* isBlock: 阻止这个 block 收集自身 */
+  );
   // 在 vnode 上保留当前 Block 收集的动态子节点
-  vnode.dynamicChildren = currentBlock || EMPTY_ARR
-  blockStack.pop()
+  vnode.dynamicChildren = currentBlock || EMPTY_ARR;
+  blockStack.pop();
   // 当前 Block 恢复到父 Block
-  currentBlock = blockStack[blockStack.length - 1] || null
+  currentBlock = blockStack[blockStack.length - 1] || null;
   // 节点本身作为父 Block 收集的子节点
   if (currentBlock) {
-    currentBlock.push(vnode)
+    currentBlock.push(vnode);
   }
-  return vnode
+  return vnode;
 }
-
 ```
 
 这时候你可能会好奇，为什么要设计 openBlock 和 createBlock 两个函数呢?为什么不把 openBlock 和 createBlock 放在一个函数中执行呢
 
 ```js
 function render() {
-  return (openBlock(),createBlock('div', null, [/*...*/]))
+  return (
+    openBlock(),
+    createBlock("div", null, [
+      /*...*/
+    ])
+  );
 }
 ```
 
 ```js
 function render() {
-  return (createBlock('div', null, [/*...*/]))
+  return createBlock("div", null, [
+    /*...*/
+  ]);
 }
 function createBlock(type, props, children, patchFlag, dynamicProps) {
-  openBlock()
+  openBlock();
   // 创建 vnode
-  const vnode = createVNode(type, props, children, patchFlag, dynamicProps, true)
-  // ...  
-  return vnode
+  const vnode = createVNode(
+    type,
+    props,
+    children,
+    patchFlag,
+    dynamicProps,
+    true
+  );
+  // ...
+  return vnode;
 }
-
 ```
 
 这样是不行的！其中原因其实很简单，createBlock 函数的第三个参数是 children，这些 children 中的元素也是经过 createVNode 创建的，显然一个函数的调用需要先去执行参数的计算，也就是优先去创建子节点的 vnode，然后才会执行父节点的 createBlock 或者是 createVNode,所以在父节点的 createBlock 函数执行前，子节点就已经通过 createVNode 创建了对应的 vnode ，如果把 openBlock 的逻辑放在了 createBlock 中，就相当于在子节点创建后才创建 currentBlock，这样就不能正确地收集子节点中的动态 vnode 了。再回到 createBlock 函数内部，这个时候你要明白动态子节点已经被收集到 currentBlock 中了。函数首先会执行 createVNode 创建一个 vnode 节点，注意最后一个参数是 true，这表明它是一个 Block node，所以就不会把自身当作一个动态 vnode 收集到 currentBlock 中。接着把收集动态子节点的 currentBlock 保留到当前的 Block vnode 的 dynamicChildren 中，为后续 patch 过程访问这些动态子节点所用。最后把当前 Block 恢复到父 Block，如果父 Block 存在的话，则把当前这个 Block node 作为动态节点添加到父 Block 中。
@@ -1358,8 +1380,91 @@ Block Tree 的构造过程我们搞清楚了，那么接下来我们就来看它
 
 通过学习,应该了解了 AST 是如何生成可运行的代码，也应该明白了 Vue.js 3.0 是如何通过 Block 的方式实现了运行时组件更新的性能优化
 
-## 实用特性：探索更多实用特性背后的原理 
+## 实用特性：探索更多实用特性背后的原理
 
 Vue.js 除了核心的组件化和响应式之外，还提供了很多非常实用的特性供我们使用，比如组件的 props、slot、directive 等特性，它们让我们的开发更加灵活。由于我们平时工作中会经常接触到这些特性，除了熟练运用它们之外，我建议你把它们底层的实现原理搞清楚，这样你就能更加自如地应用，并且在出现 bug 的时候能第一时间定位到问题。
 
-### 
+## Props 的初始化和更新流程是怎样的
+
+Vue.js 的核心思想之一是组件化，页面可以由一个个组件构建而成，组件是一种抽象的概念，它是对页面的部分布局和逻辑的封装，为了让组件支持各种丰富的功能，Vue.js 设计了 Props 特性，它允许组件的使用者在外部传递 Props，然后组件内部就可以根据这些 Props 去实现各种各样的功能
+
+```html
+<div class="blog-post">
+  <h1>{{title}}</h1>
+  <p>author: {{author}}</p>
+</div>
+<script>
+  export default {
+    props: {
+      title: String,
+      author: String,
+    },
+  };
+</script>
+```
+
+```html
+<blog-post title="Vue3 publish" author="yyx"></blog-post>
+```
+
+从最终结果来看，BlogPost 组件会渲染传递的 title 和 author 数据,我们平时写组件，会经常和 Props 打交道，但你知道 Vue.js 内部是如何初始化以及更新 Props 的呢？Vue.js 3.0 在 props 的 API 设计上和 Vue.js 2.x 保持一致，那它们的底层实现层面有没有不一样的地方呢？带着这些疑问，让我们来一起探索 Props 的相关实现原理吧
+
+### Props 的初始化
+
+首先，我们来了解 Props 的初始化过程。之前在介绍 Setup 组件初始化的章节，我们介绍了在执行 setupComponent 函数的时候，会初始化 Props,所以 Props 初始化，就是通过 initProps 方法来完成的，我们来看一下它的实现,初始化 Props 主要做了以下几件事情：**设置 props 的值，验证 props 是否合法，把 props 变成响应式，以及添加到实例 instance.props 上**,这里我们只分析有状态组件的 Props 初始化过程，所以就默认 isStateful 的值是 true。所谓有状态组件，就是你平时通过对象的方式定义的组件,接下来，我们来看设置 Props 的流程
+
+### 设置 Props
+
+我们看一下 setFullProps 的实现,我们先注意函数的几个参数的含义：instance 表示组件实例；rawProps 表示原始的 props 值，也就是创建 vnode 过程中传入的 props 数据；props 用于存储解析后的 props 数据；attrs 用于存储解析后的普通属性数据。
+
+设置 Props 的过程也分成几个步骤：标准化 props 的配置，遍历 props 数据求值，以及对需要转换的 props 求值,接下来，我们来看标准化 props 配置的过程，先看一下 normalizePropsOptions 函数的实现
+
+normalizePropsOptions 主要目的是标准化 props 的配置，这里需要注意，你要区分 props 的配置和 props 的数据。所谓 props 的配置，就是你在定义组件时编写的 props 配置，它用来描述一个组件的 props 是什么样的；而 props 的数据，是父组件在调用子组件的时候，给子组件传递的数据,所以这个函数首先会处理 mixins 和 extends 这两个特殊的属性，因为它们的作用都是扩展组件的定义，所以需要对它们定义中的 props 递归执行 normalizePropsOptions
+
+接着，函数会处理数组形式的 props 定义,如果 props 被定义成数组形式，那么数组的每个元素必须是一个字符串，然后把字符串都变成驼峰形式作为 key，并为 normalized 的 key 对应的每一个值创建一个空对象,如果 props 定义是一个对象形式，接着就是标准化它的每一个 prop 的定义，把数组或者函数形式的 prop 标准化成对象形式,接下来，就是判断一些 prop 是否需要转换，其中，含有布尔类型的 prop 和有默认值的 prop 需要转换，这些 prop 的 key 保存在 needCastKeys 中。注意，这里会给 prop 添加两个特殊的 key，`prop[0] `和 `prop[1]`赋值，它们的作用后续我们会说
+
+最后，返回标准化结果 normalizedEntry，它包含标准化后的 props 定义 normalized，以及需要转换的 props key needCastKeys，并且用 comp.\_\_props 缓存这个标准化结果，如果对同一个组件重复执行 normalizePropsOptions，直接返回这个标准化结果即可。标准化 props 配置的目的无非就是支持用户各种的 props 配置写法，标准化统一的对象格式为了后续统一处理
+
+我们回到 setFullProps 函数，接下来分析遍历 props 数据求值的流程,该过程主要就是遍历 rawProps，拿到每一个 key。由于我们在标准化 props 配置过程中已经把 props 定义的 key 转成了驼峰形式，所以也需要把 rawProps 的 key 转成驼峰形式，然后对比看 prop 是否在配置中定义,如果 rawProps 中的 prop 在配置中定义了，那么把它的值赋值到 props 对象中，如果不是，那么判断这个 key 是否为非事件派发相关，如果是那么则把它的值赋值到 attrs 对象中。另外，在遍历的过程中，遇到 key、ref 这种 key，则直接跳过
+
+接下来我们来看 setFullProps 的最后一个流程：对需要转换的 props 求值,在 normalizePropsOptions 的时候，我们拿到了需要转换的 props 的 key，接下来就是遍历 needCastKeys，依次执行 resolvePropValue 方法来求值。我们来看一下它的实现,resolvePropValue 主要就是针对两种情况的转换，第一种是默认值的情况，即我们在 prop 配置中定义了默认值，并且父组件没有传递数据的情况，这里 prop 对应的值就取默认值,第二种是布尔类型的值，前面我们在 normalizePropsOptions 的时候已经给 prop 的定义添加了两个特殊的 key，所以 `opt[0]` 为 true 表示这是一个含有 Boolean 类型的 prop，然后判断是否有传对应的值，如果不是且没有默认值的话，就直接转成 false，举个例子,如果父组件调用子组件的时候没有给 author 这个 prop 传值，那么它转换后的值就是 false,接着看`opt[1]`为 true，并且 props 传值是空字符串或者是 key 字符串的情况，命中这个逻辑表示这是一个含有 Boolean 和 String 类型的 prop，且 Boolean 在 String 前面,这种时候如果传递的 prop 值是空字符串，或者是 author 字符串，则 prop 的值会被转换成 true
+
+至此，props 的转换求值结束，整个 setFullProps 函数逻辑也结束了，回顾它的整个流程，我们可以发现它的主要目的就是对 props 求值，然后把求得的值赋值给 props 对象和 attrs 对象中
+
+### 验证 Props
+
+接下来我们再回到 initProps 函数，分析第二个流程：验证 props 是否合法,验证过程是在非生产环境下执行的，我们来看一下 validateProps 的实现,顾名思义，validateProps 就是用来检测前面求得的 props 值是否合法，它就是对标准化后的 Props 配置对象进行遍历，拿到每一个配置 opt，然后执行 validateProp 验证,对于单个 Prop 的配置，我们除了配置它的类型 type，还可以配置 required 表明它的必要性，以及 validator 自定义校验器,因此 validateProp 首先验证 required 的情况，一旦 prop 配置了 required 为 true，那么必须给它传值，否则会报警告。接着是验证 prop 值的类型，由于 prop 定义的 type 可以是多个类型的数组，那么只要 prop 的值匹配其中一种类型，就是合法的，否则会报警告,最后是验证如果配了自定义校验器 validator，那么 prop 的值必须满足自定义校验器的规则，否则会报警告
+
+### 响应式处理
+
+我们再回到 initProps 方法，来看最后一个流程：把 props 变成响应式，添加到实例 instance.props 上,在前两个流程，我们通过 setFullProps 求值赋值给 props 变量，并对 props 做了检测，接下来，就是把 props 变成响应式，并且赋值到组件的实例上,至此，Props 的初始化就完成了，相信你可能会有一些疑问，为什么 instance.props 要变成响应式，以及为什么用 shallowReactive API 呢？在接下来的 Props 更新流程的分析中，我来解答这两个问题
+
+### Props 的更新
+
+所谓 Props 的更新主要是指 Props 数据的更新，它最直接的反应是会触发组件的重新渲染,在组件更新的章节我们说过，组件的重新渲染会触发 patch 过程，然后遍历子节点递归 patch，那么遇到组件节点，会执行 updateComponent 方法,在这个过程中，会执行 shouldUpdateComponent 方法判断是否需要更新子组件，内部会对比 props，由于我们的 prop 数据 msg 由 Hello world 变成了 Hello Vue，值不一样所以 shouldUpdateComponent 会返回 true，这样就把新的子组件 vnode 赋值给 instance.next，然后执行 instance.update 触发子组件的重新渲染。所以这就是触发子组件重新渲染的原因，但是子组件重新渲染了，子组件实例的 instance.props 的数据需要更新才行，不然还是渲染之前的数据，那么是如何更新 instance.props 的呢，我们接着往下看
+
+执行 instance.update 函数，实际上是执行 componentEffect 组件副作用渲染函数,在更新组件的时候，会判断是否有 instance.next,它代表新的组件 vnode，根据前面的逻辑 next 不为空，所以会执行 updateComponentPreRender 更新组件 vnode 节点信息，我们来看一下它的实现,其中，会执行 updateProps 更新 props 数据，我们来看它的实现,updateProps 主要的目标就是把父组件渲染时求得的 props 新值，更新到子组件实例的 instance.props 中,在编译阶段，我们除了捕获一些动态 vnode，也捕获了动态的 props，所以我们可以只去比对动态的 props 数据更新,当然，如果不满足优化的条件，我们也可以通过 setFullProps 去全量比对更新 props，并且，由于新的 props 可能是动态的，因此会把那些不在新 props 中但存在于旧 props 中的值设置为 undefined
+
+好了，至此我们搞明白了子组件实例的 props 值是如何更新的，那么我们现在来思考一下前面的一个问题，为什么 instance.props 需要变成响应式呢？其实这是一种需求，因为我们也希望在子组件中可以监听 props 值的变化做一些事情,我们再来看为什么用 shallowReactive API 呢？shallow 的字面意思是浅的，从实现上来说，就是不会递归执行 reactive，只劫持最外一层对象,shallowReactive 和普通的 reactive 函数的主要区别是处理器函数不同,shallowReactive 创建的 getter 函数，shallow 变量为 true，那么就不会执行后续的递归 reactive 逻辑。也就是说，shallowReactive 只把对象 target 的最外一层属性的访问和修改处理成响应式,之所以可以这么做，是因为 props 在更新的过程中，只会修改最外层属性，所以用 shallowReactive 就足够了
+
+## 插槽：如何实现内容分发
+
+前面一节课我们学习了 Props，使用它我们可以让组件支持不同的配置来实现不同的功能。不过，有些时候我们希望子组件模板中的部分内容可以定制化，这个时候使用 Props 就显得不够灵活和易用了。因此，Vue.js 受到 Web Component 草案的启发，通过插槽的方式实现内容分发，它允许我们在父组件中编写 DOM 并在子组件渲染时把 DOM 添加到子组件的插槽中，使用起来非常方便
+
+### 插槽的实现
+
+在分析具体的代码前，我们先来想一下插槽的特点，其实就是在父组件中去编写子组件插槽部分的模板，然后在子组件渲染的时候，把这部分模板内容填充到子组件的插槽中,所以在父组件渲染阶段，子组件插槽部分的 DOM 是不能渲染的，需要通过某种方式保留下来，等到子组件渲染的时候再渲染。顺着这个思路，我们来分析具体实现的代码
+
+前面我们学习过 createBlock，它的内部通过执行 createVNode 创建了 vnode，注意 createBlock 函数的第三个参数，它表示创建的 vnode 子节点，在我们这个例子中，它是一个对象。通常，我们创建 vnode 传入的子节点是一个数组，那么对于对象类型的子节点，它内部做了哪些处理呢？我们来回顾一下 createVNode 的实现,其中，normalizeChildren 就是用来处理传入的参数 children,normalizeChildren 函数主要的作用就是标准化 children 以及获取 vnode 的节点类型 shapeFlag,这里，我们重点关注插槽相关的逻辑。经过处理，vnode.children 仍然是传入的对象数据，而 vnode.shapeFlag 会与 slot 子节点类型 SLOTS_CHILDREN 进行或运算，由于 vnode 本身的 shapFlag 是 STATEFUL_COMPONENT，所以运算后的 shapeFlag 是 SLOTS_CHILDREN | STATEFUL_COMPONENT,确定了 shapeFlag，会影响后续的 patch 过程，我们知道在 patch 中会根据 vnode 的 type 和 shapeFlag 来决定后续的执行逻辑，我们来回顾一下它的实现,这里由于 type 是组件对象，shapeFlag 满足 shapeFlag&6 的情况，所以会走到 processComponent 的逻辑，递归去渲染子组件,至此，带有子节点插槽的组件与普通的组件渲染并无区别，还是通过递归的方式去渲染子组件,渲染子组件又会执行组件的渲染逻辑了，这个流程我们在前面的章节已经分析过，其中有一个 setupComponent 的流程，我们来回顾一下它的实现,注意，这里的 instance.vnode 就是组件 vnode，我们可以从中拿到子组件的实例、props 和 children 等数据。setupComponent 执行过程中会通过 initSlots 函数去初始化插槽，并传入 instance 和 children
+
+initSlots 的实现逻辑很简单，这里的 children 就是前面传入的插槽对象数据，然后我们把它保留到 instance.slots 对象中，后续我们就可以从 instance.slots 拿到插槽的数据了,到这里，我们在子组件的初始化过程中就拿到由父组件传入的插槽数据了，那么接下来，我们就来分析子组件是如何把这些插槽数据渲染到页面上的吧
+
+子组件的插槽部分的 DOM 主要通过 renderSlot 方法渲染生成的,renderSlot 函数的第一个参数 slots 就是 instance.slots，我们在子组件初始化的时候已经获得了这个 slots 对象，第二个参数是 name,renderSlot 的实现也很简单，首先根据第二个参数 name 获取对应的插槽函数 slot，接着通过 createBlock 创建了 vnode 节点，注意，它的类型是一个 Fragment，children 是执行 slot 插槽函数的返回值
+
+我们知道，createBlock 内部是会执行 createVNode 创建 vnode，vnode 创建完后，仍然会通过 patch 把 vnode 挂载到页面上，那么对于插槽的渲染，patch 过程又有什么不同呢？注意这里我们的 vnode 的 type 是 Fragement，所以在执行 patch 的时候，会执行 processFragment 逻辑
+
+processFragment 函数首先通过 hostInsert 在容器的前后插入两个空文本节点，然后在以尾文本节点作为参考锚点，通过 mountChildren 把 children 挂载到 container 容器中
+
+至此，我们就完成了子组件插槽内容的渲染。可以看到，**插槽的实现实际上就是一种延时渲染，把父组件中编写的插槽内容保存到一个对象上，并且把具体渲染 DOM 的代码用函数的方式封装，然后在子组件渲染的时候，根据插槽名在对象中找到对应的函数，然后执行这些函数做真正的渲染**。
+
+## 指令完整的生命周期是怎样的
