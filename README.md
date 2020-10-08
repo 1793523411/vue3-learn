@@ -1468,3 +1468,181 @@ processFragment 函数首先通过 hostInsert 在容器的前后插入两个空�
 至此，我们就完成了子组件插槽内容的渲染。可以看到，**插槽的实现实际上就是一种延时渲染，把父组件中编写的插槽内容保存到一个对象上，并且把具体渲染 DOM 的代码用函数的方式封装，然后在子组件渲染的时候，根据插槽名在对象中找到对应的函数，然后执行这些函数做真正的渲染**。
 
 ## 指令完整的生命周期是怎样的
+
+我们知道 Vue.js 的核心思想之一是数据驱动，数据是 DOM 的映射。在大部分情况下，你是不用操作 DOM 的，但是这并不意味着你不能操作 DOM。有些时候，我们希望手动去操作某个元素节点的 DOM，比如当这个元素节点挂载到页面的时候通过操作底层的 DOM 来做一些事情。为了支持这个需求，Vue.js提供了指令的功能，它允许我们自定义指令，作用在普通的 DOM 元素上。
+
+那么接下来，我们就从指令的定义、指令的注册和指令的应用三个方面来一起探究它的实现原理
+
+### 指令的定义
+
+指令本质上就是一个 JavaScript 对象，对象上挂着一些钩子函数，比如我定义一个 v-log 指令，这个指令做的事情就是在指令的各个生命周期去输出一些 log 信息
+
+```js
+const logDirective = {
+  beforeMount() {
+    console.log('log directive before mount')
+  },
+  mounted() {
+     console.log('log directive mounted')
+  },
+  beforeUpdate() {
+    console.log('log directive before update')
+  },
+  updated() {
+    console.log('log directive updated')
+  },
+  beforeUnmount() {
+    console.log('log directive beforeUnmount')
+  },
+  unmounted() {
+    console.log('log directive unmounted')
+  }
+}
+```
+然后你可以在创建应用后注册它
+
+```js
+import { createApp } from 'vue'
+import App from './App'
+const app = createApp(App)
+app.directive('log', logDirective)
+app.mount('#app')
+```
+
+一个指令的定义，无非就是在合适的钩子函数中编写一些相关的处理逻辑
+
+### 指令的注册
+
+所以当我们编写好指令后，在应用它之前，我们需要先注册它。所谓注册，其实就是把指令的定义保存到相应的地方，未来使用的时候我可以从保存的地方拿到它。指令的注册和组件一样，可以全局注册，也可以局部注册。我们来分别看一下它们的实现原理
+
+首先，我们来了解全局注册的方式，它是通过 app.directive 方法去注册的,directive 是 app 对象上的一个方法，它接受两个参数，第一个参数是指令的名称，第二个参数就是指令对象,指令全局注册方法的实现非常简单，就是把指令对象注册到 app 对象创建的全局上下文 context.directives 中，并用 name 作为 key,这里有几个细节要注意一下，validateDirectiveName 是用来检测指令名是否和内置的指令（如 v-model、v-show）冲突；如果不传第二个参数指令对象，表示这是一次指令的获取；指令重复注册会报警告。
+
+接下来，我们来了解局部注册的方式，它是直接在组件对象中定义的,因此全局注册和局部注册的区别是，一个保存在 appContext 中，一个保存在组件对象的定义中。
+
+### 指令的应用
+
+接下来，我们重点分析指令的应用过程，我们以 v-focus 指令为例，在组件中使用这个指令：`<input v-focus />`
+
+我们先看这个模板编译后生成的 render 函数：
+
+```js
+import { resolveDirective as _resolveDirective, createVNode as _createVNode, withDirectives as _withDirectives, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+  const _directive_focus = _resolveDirective("focus")
+  return _withDirectives((_openBlock(), _createBlock("input", null, null, 512 /* NEED_PATCH */)), [
+    [_directive_focus]
+  ])
+}
+```
+
+我们再来看看如果不使用 v-focus，单个 input 编译生成后的 render 函数是怎样的：
+
+```js
+import { createVNode as _createVNode, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+  return (_openBlock(), _createBlock("input"))
+}
+```
+对比两个编译结果可以看到，区别在于如果元素节点使用指令，那么它编译生成的 vnode 会用 withDirectives 包装一层。
+
+在分析 withDirectives 函数的实现之前先来看指令的解析函数 resolveDirective，因为前面我们已经了解指令的注册其实就是把定义的指令对象保存下来，那么 resolveDirective 做的事情就是根据指令的名称找到保存的对应指令对象，我们来看一下它的实现,可以看到，resolveDirective 内部调用了 resolveAsset 函数，传入的类型名称为 directives 字符串。
+
+resolveAsset 内部先通过 resolve函数解析局部注册的资源，由于我们传入的是 directives，所以就从组件定义对象上的 directives 属性中查找对应 name 的指令，如果查找不到则通过 instance.appContext，也就是我们前面提到的全局的 appContext，根据其中的 name查找对应的指令。所以 resolveDirective 的实现很简单，优先查找组件是否局部注册该指令，如果没有则看是否全局注册该指令，如果还找不到则在非生产环境下报警告，提示用户没有解析到该指令。如果你平时在开发工作中遇到这个警告，那么你很可能就是没有注册这个指令，或者是 name 写得不对,注意，在 resolve 函数实现的过程中，它会先根据 name 匹配，如果失败则把 name 变成驼峰格式继续匹配，还匹配不到则把 name 首字母大写后继续匹配，这么做是为了让用户编写指令名称的时候可以更加灵活，所以需要多判断几步用户可能编写的指令名称的情况。
+
+接下来，我们来分析 withDirectives 的实现,withDirectives 函数第一个参数是 vnode，第二个参数是指令构成的数组，因为一个元素节点上是可以应用多个指令的,withDirectives 其实就是给 vnode 添加了一个 dirs 属性，属性的值就是这个元素节点上的所有指令构成的对象数组。它通过对 directives 的遍历，拿到每一个指令对象以及指令对应的值 value、参数 arg、修饰符 modifiers 等，然后构造成一个 binding 对象，这个对象还绑定了组件的实例 instance
+
+这么做的目的是在元素的生命周期中知道运行哪些指令相关的钩子函数，以及在运行这些钩子函数的时候，还可以往钩子函数中传递一些指令相关的参数,那么，接下来我们就来看在元素的生命周期中是如何运行这些钩子函数的
+
+首先，我们来看元素挂载时候会执行哪些指令的钩子函数。通过前面章节的学习我们了解到，一个元素的挂载是通过执行 mountElement 函数完成的，我们再来回顾一下它的实现,这一次，我们添加了元素指令调用的相关代码，可以直观地看到，在元素插入到容器之前会执行指令的 beforeMount 钩子函数，在插入元素之后，会通过 queuePostRenderEffect 的方式执行指令的 mounted 钩子函数,钩子函数的执行，是通过调用 invokeDirectiveHook 方法完成的,invokeDirectiveHook 函数有四个参数，第一个和第二个参数分别代表新旧 vnode，第三个参数是组件实例 instance，第四个参数是钩子名称 name
+
+invokeDirectiveHook 的实现很简单，通过遍历 vnode.dirs 数组，找到每一个指令对应的 binding 对象，然后从 binding 对象中根据 name 找到指令定义的对应的钩子函数，如果定义了这个钩子函数则执行它，并且传入一些响应的参数，包括元素的 DOM 节点 el，binding 对象，新旧 vnode，这就是我们在执行指令钩子函数的时候，可以访问到这些参数的原因
+
+另外我们注意到，mounted 钩子函数会用 queuePostRenderEffect 包一层执行，这么做和组件的初始化过程执行 mounted 钩子函数一样，在整个应用 render 完毕后，同步执行 flushPostFlushCbs 的时候执行元素指令的 mounted 钩子函数
+
+接下来，我们来看元素更新时候会执行哪些指令的钩子函数。通过前面章节的学习我们了解到，一个元素的更新是通过执行 patchElement 函数，我们再来回顾一下它的实现,这一次，我们添加了元素指令调用的相关代码，可以直观地看到，在更新子节点之前会执行指令的 beforeUpdate 钩子函数，在更新完子节点之后，会通过 queuePostRenderEffect 的方式执行指令的 updated 钩子函数。
+
+最后，我们来看元素卸载时候会执行哪些指令的钩子函数。通过前面章节的学习我们了解到，一个元素的卸载是通过执行 unmount 函数，我们再来回顾一下它的实现,unmount 方法的主要思路就是用递归的方式去遍历删除自身节点和子节点。可以看到，在移除元素的子节点之前会执行指令的 beforeUnmount 钩子函数，在移除子节点和当前节点之后，会通过 queuePostRenderEffect 的方式执行指令的 unmounted 钩子函数。
+
+了解指令是如何定义、如何注册，以及如何应用的。指令无非就是给我们提供了在一个元素的生命周期中注入代码的途径，它的本身实现是很简单的
+
+## v-model：双向绑定到底是怎么实现的
+
+很多人学习 Vue.js，会把 Vue.js 的响应式原理误解为双向绑定。其实响应式原理是一种单向行为，它是数据到 DOM 的映射。而真正的双向绑定，除了数据变化，会引起 DOM 的变化之外，还应该在操作 DOM 改变后，反过来影响数据的变化,那么 Vue.js 里有内置的双向绑定的实现吗？答案是有的，v-model 指令就是一种双向绑定的实现，我们在平时项目开发中，也经常会使用 v-model,v-model 也不是可以作用到任意标签，它只能在一些特定的表单标签如 input、select、textarea 和自定义组件中使用,那么 v-model 的实现原理到底是怎样的呢？接下来，我们从普通表单元素和自定义组件两个方面来分别分析它的实现
+
+### 在普通表单元素上作用 v-model
+
+首先，我们来看在普通表单元素上作用 v-model，还是先举一个基本的示例：`<input v-model="searchText"/>`。
+
+我们先看这个模板编译后生成的 render 函数
+
+```js
+import { vModelText as _vModelText, createVNode as _createVNode, withDirectives as _withDirectives, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+  return _withDirectives((_openBlock(), _createBlock("input", {
+    "onUpdate:modelValue": $event => (_ctx.searchText = $event)
+  }, null, 8 /* PROPS */, ["onUpdate:modelValue"])), [
+    [_vModelText, _ctx.searchText]
+  ])
+}
+
+```
+
+可以看到，作用在 input 标签的 v-model 指令在编译后，除了使用 withDirectives 给这个 vnode 添加了 vModelText 指令对象外，还额外传递了一个名为 onUpdate:modelValue 的 prop，它的值是一个函数，这个函数就是用来更新变量 searchText
+
+我们来看 vModelText 的实现,接下来，我们就来拆解这个指令的实现。首先，这个指令实现了两个钩子函数，created 和 beforeUpdate,我们先来看 created 部分的实现，根据上节课的分析，我们知道第一个参数 el 是节点的 DOM 对象，第二个参数是 binding 对象，第三个参数 vnode 是节点的 vnode 对象,created 函数首先把 v-model 绑定的值 value 赋值给 el.value，这个就是数据到 DOM 的单向流动；接着通过 getModelAssigner 方法获取 props 中的 onUpdate:modelValue 属性对应的函数，赋值给 el._assign 属性；最后通过 addEventListener 来监听 input 标签的事件，它会根据是否配置 lazy 这个修饰符来决定监听 input 还是 change 事件
+
+我们接着看这个事件监听函数，当用户手动输入一些数据触发事件的时候，会执行函数，并通过 el.value 获取 input 标签新的值，然后调用 el._assign 方法更新数据，这就是 DOM 到数据的流动,至此，我们就实现了数据的双向绑定，就是这么简单。接着我们来看 input v-model 支持的几个修饰符都分别代表什么含义。
+
+#### lazy 修饰符
+
+如果配置了 lazy 修饰符，那么监听的是 input 的 change 事件，它不会在input输入框实时输入的时候触发，而会在 input 元素值改变且失去焦点的时候触发,如果不配置 lazy，监听的是 input 的 input 事件，它会在用户实时输入的时候触发。此外，还会多监听 compositionstart 和 compositionend 事件,当用户在使用一些中文输入法的时候，会触发 compositionstart 事件，这个时候设置 e.target.composing 为 true，这样虽然 input 事件触发了，但是 input 事件的回调函数里判断了 e.target.composing 的值，如果为 true 则直接返回，不会把 DOM 值赋值给数据,然后当用户从输入法中确定选中了一些数据完成输入后，会触发 compositionend 事件，这个时候判断 e.target.composing 为 true 的话则把它设置为 false，然后再手动触发元素的 input 事件，完成数据的赋值
+
+#### trim 修饰符
+
+如果配置了 trim 修饰符，那么会在 input 或者 change 事件的回调函数中，在获取 DOM 的值后，手动调用 trim 方法去除首尾空格。另外，还会额外监听 change 事件执行 el.value.trim() 把 DOM 的值的首尾空格去除。
+
+#### number 修饰符
+
+如果配置了 number 修饰符，或者 input 的 type 是 number，就会把 DOM 的值转成 number 类型后再赋值给数据
+
+接下来我们再来看一下 beforeUpdate 钩子函数的实现，非常简单，主要就是在组件更新前判断如果数据的值和 DOM 的值不同，则把数据更新到 DOM 上
+
+### 在自定义组件上作用 v-model
+
+接下来，我们来分析自定义组件上作用 v-model，看看它与表单的 v-model 有哪些不同
+
+```js
+app.component('custom-input', {
+  props: ['modelValue'],
+  template: `
+    <input v-model="value">
+  `,
+  computed: {
+    value: {
+      get() {
+        return this.modelValue
+      },
+      set(value) {
+        this.$emit('update:modelValue', value)
+      }
+    }
+  }
+})
+
+```
+我们先通过 app.component 全局注册了一个 custom-input 自定义组件，内部我们使用了原生的 input 并使用了 v-model 指令实现数据的绑定,注意这里我们不能直接把 modelValue 作为 input 对应的 v-model 数据，因为不能直接对 props 的值修改，因此这里使用计算属性,计算属性 value 对应的 getter 函数是直接取 modelValue 这个 prop 的值，而 setter 函数是派发一个自定义事件 update:modelValue,接下来我们就可以在应用的其他的地方使用这个自定义组件了`<custom-input v-model="searchText"/>`,
+
+我们来看一下这个模板编译后生成的 render 函数,可以看到，编译的结果似乎和指令没有什么关系，并没有调用 withDirective 函数,我们对示例稍做修改`<custom-input :modelValue="searchText" @update:modelValue="$event=>{searchText = $event}"/>`,然后我们再来看它编译后生成的 render 函数,我们发现，它和前面示例的编译结果是一模一样的，因为 v-model 作用于组件上本质就是一个语法糖，就是往组件传入了一个名为 modelValue 的 prop，它的值是往组件传入的数据 data，另外它还在组件上监听了一个名为 update:modelValue 的自定义事件，事件的回调函数接受一个参数，执行的时候会把参数 $event 赋值给数据 data。正因为这个原理，所以我们想要实现自定义组件的 v-model，首先需要定义一个名为 modelValue 的 prop，然后在数据改变的时候，派发一个名为 update:modelValue 的事件。
+
+Vue.js 3.0 关于组件 v-model 的实现和 Vue.js 2.x 实现是很类似的，在 Vue.js 2.x 中，想要实现自定义组件的 v-model，首先需要定义一个名为 value 的 prop，然后在数据改变的时候，派发一个名为 input 的事件
+
+总结下来，作用在组件上的 v-model 实际上就是一种打通数据双向通讯的语法糖，即外部可以往组件上传递数据，组件内部经过某些操作行为修改了数据，然后把更改后的数据再回传到外部。v-model 在自定义组件的设计中非常常用，你可以看到 Element UI 几乎所有的表单组件都是通过 v-model 的方式完成了数据的交换,一旦我们使用了 v-model 的方式，我们必须在组件中申明一个 modelValue 的 prop，如果不想用这个 prop，想换个名字，当然也是可以的,Vue.js 3.0 给组件的 v-model 提供了参数的方式，允许我们指定 prop 的名称：`<custom-input v-model:text="searchText"/>`,然后我们再来看编译后的 render 函数,可以看到，我们往组件传递的 prop 变成了 text，监听的自定义事件也变成了 @update:text 了,显然，如果 v-model 支持了参数，那么我们就可以在一个组件上使用多个 v-model 了
+
+
+至此，我们就掌握了组件 v-model 的实现原理，**它的本质就是语法糖：通过 prop 向组件传递数据，并监听自定义事件接受组件反传的数据并更新**。prop 的实现原理我们之前分析过，但自定义事件是如何派发的呢？因为从模板的编译结果看，除了 modelValue 这个 prop，还多了一个 onUpdate:modelValue 的 prop，它和自定义事件有什么关系？接下来我们就来分析这部分的实现。
+
+### 自定义事件派发
+
+从前面的示例我们知道，子组件会执行`this.$emit('update:modelValue',value)`方法派发自定义事件，$emit 内部执行了 emit 方法，我们来看一下它的实现,emit 方法支持 3 个参数，第一个参数 instance 是组件的实例，也就是执行 $emit 方法的组件实例，第二个参数 event 是自定义事件名称，第三个参数 args 是事件传递的参数,emit 方法首先获取事件名称，把传递的 event 首字母大写，然后前面加上 on 字符串，比如我们前面派发的 update:modelValue 事件名称，处理后就变成了 onUpdate:modelValue,接下来，通过这个事件名称，从 props 中根据事件名找到对应的 prop 值，作为事件的回调函数,如果找不到对应的 prop 并且 event 是以 update: 开头的，则尝试把 event 名先转成连字符形式然后再处理,找到回调函数 handler 后，再去执行这个回调函数，并且把参数 args 传入。针对 v-model 场景，这个回调函数就是拿到子组件回传的数据然后修改父元素传入到子组件的 prop 数据，这样就达到了数据双向通讯的目的
+
+了解 v-model 在普通表单元素上以及在自定义指令上的实现原理分别是怎样的，以及了解自定义事件派发的实现原理
