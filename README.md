@@ -1469,7 +1469,7 @@ processFragment 函数首先通过 hostInsert 在容器的前后插入两个空�
 
 ## 指令完整的生命周期是怎样的
 
-我们知道 Vue.js 的核心思想之一是数据驱动，数据是 DOM 的映射。在大部分情况下，你是不用操作 DOM 的，但是这并不意味着你不能操作 DOM。有些时候，我们希望手动去操作某个元素节点的 DOM，比如当这个元素节点挂载到页面的时候通过操作底层的 DOM 来做一些事情。为了支持这个需求，Vue.js提供了指令的功能，它允许我们自定义指令，作用在普通的 DOM 元素上。
+我们知道 Vue.js 的核心思想之一是数据驱动，数据是 DOM 的映射。在大部分情况下，你是不用操作 DOM 的，但是这并不意味着你不能操作 DOM。有些时候，我们希望手动去操作某个元素节点的 DOM，比如当这个元素节点挂载到页面的时候通过操作底层的 DOM 来做一些事情。为了支持这个需求，Vue.js 提供了指令的功能，它允许我们自定义指令，作用在普通的 DOM 元素上。
 
 那么接下来，我们就从指令的定义、指令的注册和指令的应用三个方面来一起探究它的实现原理
 
@@ -1480,33 +1480,34 @@ processFragment 函数首先通过 hostInsert 在容器的前后插入两个空�
 ```js
 const logDirective = {
   beforeMount() {
-    console.log('log directive before mount')
+    console.log("log directive before mount");
   },
   mounted() {
-     console.log('log directive mounted')
+    console.log("log directive mounted");
   },
   beforeUpdate() {
-    console.log('log directive before update')
+    console.log("log directive before update");
   },
   updated() {
-    console.log('log directive updated')
+    console.log("log directive updated");
   },
   beforeUnmount() {
-    console.log('log directive beforeUnmount')
+    console.log("log directive beforeUnmount");
   },
   unmounted() {
-    console.log('log directive unmounted')
-  }
-}
+    console.log("log directive unmounted");
+  },
+};
 ```
+
 然后你可以在创建应用后注册它
 
 ```js
-import { createApp } from 'vue'
-import App from './App'
-const app = createApp(App)
-app.directive('log', logDirective)
-app.mount('#app')
+import { createApp } from "vue";
+import App from "./App";
+const app = createApp(App);
+app.directive("log", logDirective);
+app.mount("#app");
 ```
 
 一个指令的定义，无非就是在合适的钩子函数中编写一些相关的处理逻辑
@@ -1526,28 +1527,40 @@ app.mount('#app')
 我们先看这个模板编译后生成的 render 函数：
 
 ```js
-import { resolveDirective as _resolveDirective, createVNode as _createVNode, withDirectives as _withDirectives, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+import {
+  resolveDirective as _resolveDirective,
+  createVNode as _createVNode,
+  withDirectives as _withDirectives,
+  openBlock as _openBlock,
+  createBlock as _createBlock,
+} from "vue";
 export function render(_ctx, _cache, $props, $setup, $data, $options) {
-  const _directive_focus = _resolveDirective("focus")
-  return _withDirectives((_openBlock(), _createBlock("input", null, null, 512 /* NEED_PATCH */)), [
-    [_directive_focus]
-  ])
+  const _directive_focus = _resolveDirective("focus");
+  return _withDirectives(
+    (_openBlock(), _createBlock("input", null, null, 512 /* NEED_PATCH */)),
+    [[_directive_focus]]
+  );
 }
 ```
 
 我们再来看看如果不使用 v-focus，单个 input 编译生成后的 render 函数是怎样的：
 
 ```js
-import { createVNode as _createVNode, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+import {
+  createVNode as _createVNode,
+  openBlock as _openBlock,
+  createBlock as _createBlock,
+} from "vue";
 export function render(_ctx, _cache, $props, $setup, $data, $options) {
-  return (_openBlock(), _createBlock("input"))
+  return _openBlock(), _createBlock("input");
 }
 ```
+
 对比两个编译结果可以看到，区别在于如果元素节点使用指令，那么它编译生成的 vnode 会用 withDirectives 包装一层。
 
 在分析 withDirectives 函数的实现之前先来看指令的解析函数 resolveDirective，因为前面我们已经了解指令的注册其实就是把定义的指令对象保存下来，那么 resolveDirective 做的事情就是根据指令的名称找到保存的对应指令对象，我们来看一下它的实现,可以看到，resolveDirective 内部调用了 resolveAsset 函数，传入的类型名称为 directives 字符串。
 
-resolveAsset 内部先通过 resolve函数解析局部注册的资源，由于我们传入的是 directives，所以就从组件定义对象上的 directives 属性中查找对应 name 的指令，如果查找不到则通过 instance.appContext，也就是我们前面提到的全局的 appContext，根据其中的 name查找对应的指令。所以 resolveDirective 的实现很简单，优先查找组件是否局部注册该指令，如果没有则看是否全局注册该指令，如果还找不到则在非生产环境下报警告，提示用户没有解析到该指令。如果你平时在开发工作中遇到这个警告，那么你很可能就是没有注册这个指令，或者是 name 写得不对,注意，在 resolve 函数实现的过程中，它会先根据 name 匹配，如果失败则把 name 变成驼峰格式继续匹配，还匹配不到则把 name 首字母大写后继续匹配，这么做是为了让用户编写指令名称的时候可以更加灵活，所以需要多判断几步用户可能编写的指令名称的情况。
+resolveAsset 内部先通过 resolve 函数解析局部注册的资源，由于我们传入的是 directives，所以就从组件定义对象上的 directives 属性中查找对应 name 的指令，如果查找不到则通过 instance.appContext，也就是我们前面提到的全局的 appContext，根据其中的 name 查找对应的指令。所以 resolveDirective 的实现很简单，优先查找组件是否局部注册该指令，如果没有则看是否全局注册该指令，如果还找不到则在非生产环境下报警告，提示用户没有解析到该指令。如果你平时在开发工作中遇到这个警告，那么你很可能就是没有注册这个指令，或者是 name 写得不对,注意，在 resolve 函数实现的过程中，它会先根据 name 匹配，如果失败则把 name 变成驼峰格式继续匹配，还匹配不到则把 name 首字母大写后继续匹配，这么做是为了让用户编写指令名称的时候可以更加灵活，所以需要多判断几步用户可能编写的指令名称的情况。
 
 接下来，我们来分析 withDirectives 的实现,withDirectives 函数第一个参数是 vnode，第二个参数是指令构成的数组，因为一个元素节点上是可以应用多个指令的,withDirectives 其实就是给 vnode 添加了一个 dirs 属性，属性的值就是这个元素节点上的所有指令构成的对象数组。它通过对 directives 的遍历，拿到每一个指令对象以及指令对应的值 value、参数 arg、修饰符 modifiers 等，然后构造成一个 binding 对象，这个对象还绑定了组件的实例 instance
 
@@ -1576,26 +1589,39 @@ invokeDirectiveHook 的实现很简单，通过遍历 vnode.dirs 数组，找到
 我们先看这个模板编译后生成的 render 函数
 
 ```js
-import { vModelText as _vModelText, createVNode as _createVNode, withDirectives as _withDirectives, openBlock as _openBlock, createBlock as _createBlock } from "vue"
+import {
+  vModelText as _vModelText,
+  createVNode as _createVNode,
+  withDirectives as _withDirectives,
+  openBlock as _openBlock,
+  createBlock as _createBlock,
+} from "vue";
 export function render(_ctx, _cache, $props, $setup, $data, $options) {
-  return _withDirectives((_openBlock(), _createBlock("input", {
-    "onUpdate:modelValue": $event => (_ctx.searchText = $event)
-  }, null, 8 /* PROPS */, ["onUpdate:modelValue"])), [
-    [_vModelText, _ctx.searchText]
-  ])
+  return _withDirectives(
+    (_openBlock(),
+    _createBlock(
+      "input",
+      {
+        "onUpdate:modelValue": ($event) => (_ctx.searchText = $event),
+      },
+      null,
+      8 /* PROPS */,
+      ["onUpdate:modelValue"]
+    )),
+    [[_vModelText, _ctx.searchText]]
+  );
 }
-
 ```
 
 可以看到，作用在 input 标签的 v-model 指令在编译后，除了使用 withDirectives 给这个 vnode 添加了 vModelText 指令对象外，还额外传递了一个名为 onUpdate:modelValue 的 prop，它的值是一个函数，这个函数就是用来更新变量 searchText
 
-我们来看 vModelText 的实现,接下来，我们就来拆解这个指令的实现。首先，这个指令实现了两个钩子函数，created 和 beforeUpdate,我们先来看 created 部分的实现，根据上节课的分析，我们知道第一个参数 el 是节点的 DOM 对象，第二个参数是 binding 对象，第三个参数 vnode 是节点的 vnode 对象,created 函数首先把 v-model 绑定的值 value 赋值给 el.value，这个就是数据到 DOM 的单向流动；接着通过 getModelAssigner 方法获取 props 中的 onUpdate:modelValue 属性对应的函数，赋值给 el._assign 属性；最后通过 addEventListener 来监听 input 标签的事件，它会根据是否配置 lazy 这个修饰符来决定监听 input 还是 change 事件
+我们来看 vModelText 的实现,接下来，我们就来拆解这个指令的实现。首先，这个指令实现了两个钩子函数，created 和 beforeUpdate,我们先来看 created 部分的实现，根据上节课的分析，我们知道第一个参数 el 是节点的 DOM 对象，第二个参数是 binding 对象，第三个参数 vnode 是节点的 vnode 对象,created 函数首先把 v-model 绑定的值 value 赋值给 el.value，这个就是数据到 DOM 的单向流动；接着通过 getModelAssigner 方法获取 props 中的 onUpdate:modelValue 属性对应的函数，赋值给 el.\_assign 属性；最后通过 addEventListener 来监听 input 标签的事件，它会根据是否配置 lazy 这个修饰符来决定监听 input 还是 change 事件
 
-我们接着看这个事件监听函数，当用户手动输入一些数据触发事件的时候，会执行函数，并通过 el.value 获取 input 标签新的值，然后调用 el._assign 方法更新数据，这就是 DOM 到数据的流动,至此，我们就实现了数据的双向绑定，就是这么简单。接着我们来看 input v-model 支持的几个修饰符都分别代表什么含义。
+我们接着看这个事件监听函数，当用户手动输入一些数据触发事件的时候，会执行函数，并通过 el.value 获取 input 标签新的值，然后调用 el.\_assign 方法更新数据，这就是 DOM 到数据的流动,至此，我们就实现了数据的双向绑定，就是这么简单。接着我们来看 input v-model 支持的几个修饰符都分别代表什么含义。
 
 #### lazy 修饰符
 
-如果配置了 lazy 修饰符，那么监听的是 input 的 change 事件，它不会在input输入框实时输入的时候触发，而会在 input 元素值改变且失去焦点的时候触发,如果不配置 lazy，监听的是 input 的 input 事件，它会在用户实时输入的时候触发。此外，还会多监听 compositionstart 和 compositionend 事件,当用户在使用一些中文输入法的时候，会触发 compositionstart 事件，这个时候设置 e.target.composing 为 true，这样虽然 input 事件触发了，但是 input 事件的回调函数里判断了 e.target.composing 的值，如果为 true 则直接返回，不会把 DOM 值赋值给数据,然后当用户从输入法中确定选中了一些数据完成输入后，会触发 compositionend 事件，这个时候判断 e.target.composing 为 true 的话则把它设置为 false，然后再手动触发元素的 input 事件，完成数据的赋值
+如果配置了 lazy 修饰符，那么监听的是 input 的 change 事件，它不会在 input 输入框实时输入的时候触发，而会在 input 元素值改变且失去焦点的时候触发,如果不配置 lazy，监听的是 input 的 input 事件，它会在用户实时输入的时候触发。此外，还会多监听 compositionstart 和 compositionend 事件,当用户在使用一些中文输入法的时候，会触发 compositionstart 事件，这个时候设置 e.target.composing 为 true，这样虽然 input 事件触发了，但是 input 事件的回调函数里判断了 e.target.composing 的值，如果为 true 则直接返回，不会把 DOM 值赋值给数据,然后当用户从输入法中确定选中了一些数据完成输入后，会触发 compositionend 事件，这个时候判断 e.target.composing 为 true 的话则把它设置为 false，然后再手动触发元素的 input 事件，完成数据的赋值
 
 #### trim 修饰符
 
@@ -1612,32 +1638,31 @@ export function render(_ctx, _cache, $props, $setup, $data, $options) {
 接下来，我们来分析自定义组件上作用 v-model，看看它与表单的 v-model 有哪些不同
 
 ```js
-app.component('custom-input', {
-  props: ['modelValue'],
+app.component("custom-input", {
+  props: ["modelValue"],
   template: `
     <input v-model="value">
   `,
   computed: {
     value: {
       get() {
-        return this.modelValue
+        return this.modelValue;
       },
       set(value) {
-        this.$emit('update:modelValue', value)
-      }
-    }
-  }
-})
-
+        this.$emit("update:modelValue", value);
+      },
+    },
+  },
+});
 ```
+
 我们先通过 app.component 全局注册了一个 custom-input 自定义组件，内部我们使用了原生的 input 并使用了 v-model 指令实现数据的绑定,注意这里我们不能直接把 modelValue 作为 input 对应的 v-model 数据，因为不能直接对 props 的值修改，因此这里使用计算属性,计算属性 value 对应的 getter 函数是直接取 modelValue 这个 prop 的值，而 setter 函数是派发一个自定义事件 update:modelValue,接下来我们就可以在应用的其他的地方使用这个自定义组件了`<custom-input v-model="searchText"/>`,
 
-我们来看一下这个模板编译后生成的 render 函数,可以看到，编译的结果似乎和指令没有什么关系，并没有调用 withDirective 函数,我们对示例稍做修改`<custom-input :modelValue="searchText" @update:modelValue="$event=>{searchText = $event}"/>`,然后我们再来看它编译后生成的 render 函数,我们发现，它和前面示例的编译结果是一模一样的，因为 v-model 作用于组件上本质就是一个语法糖，就是往组件传入了一个名为 modelValue 的 prop，它的值是往组件传入的数据 data，另外它还在组件上监听了一个名为 update:modelValue 的自定义事件，事件的回调函数接受一个参数，执行的时候会把参数 $event 赋值给数据 data。正因为这个原理，所以我们想要实现自定义组件的 v-model，首先需要定义一个名为 modelValue 的 prop，然后在数据改变的时候，派发一个名为 update:modelValue 的事件。
+我们来看一下这个模板编译后生成的 render 函数,可以看到，编译的结果似乎和指令没有什么关系，并没有调用 withDirective 函数,我们对示例稍做修改`<custom-input :modelValue="searchText" @update:modelValue="$event=>{searchText = $event}"/>`,然后我们再来看它编译后生成的 render 函数,我们发现，它和前面示例的编译结果是一模一样的，因为 v-model 作用于组件上本质就是一个语法糖，就是往组件传入了一个名为 modelValue 的 prop，它的值是往组件传入的数据 data，另外它还在组件上监听了一个名为 update:modelValue 的自定义事件，事件的回调函数接受一个参数，执行的时候会把参数 \$event 赋值给数据 data。正因为这个原理，所以我们想要实现自定义组件的 v-model，首先需要定义一个名为 modelValue 的 prop，然后在数据改变的时候，派发一个名为 update:modelValue 的事件。
 
 Vue.js 3.0 关于组件 v-model 的实现和 Vue.js 2.x 实现是很类似的，在 Vue.js 2.x 中，想要实现自定义组件的 v-model，首先需要定义一个名为 value 的 prop，然后在数据改变的时候，派发一个名为 input 的事件
 
 总结下来，作用在组件上的 v-model 实际上就是一种打通数据双向通讯的语法糖，即外部可以往组件上传递数据，组件内部经过某些操作行为修改了数据，然后把更改后的数据再回传到外部。v-model 在自定义组件的设计中非常常用，你可以看到 Element UI 几乎所有的表单组件都是通过 v-model 的方式完成了数据的交换,一旦我们使用了 v-model 的方式，我们必须在组件中申明一个 modelValue 的 prop，如果不想用这个 prop，想换个名字，当然也是可以的,Vue.js 3.0 给组件的 v-model 提供了参数的方式，允许我们指定 prop 的名称：`<custom-input v-model:text="searchText"/>`,然后我们再来看编译后的 render 函数,可以看到，我们往组件传递的 prop 变成了 text，监听的自定义事件也变成了 @update:text 了,显然，如果 v-model 支持了参数，那么我们就可以在一个组件上使用多个 v-model 了
-
 
 至此，我们就掌握了组件 v-model 的实现原理，**它的本质就是语法糖：通过 prop 向组件传递数据，并监听自定义事件接受组件反传的数据并更新**。prop 的实现原理我们之前分析过，但自定义事件是如何派发的呢？因为从模板的编译结果看，除了 modelValue 这个 prop，还多了一个 onUpdate:modelValue 的 prop，它和自定义事件有什么关系？接下来我们就来分析这部分的实现。
 
@@ -1646,3 +1671,256 @@ Vue.js 3.0 关于组件 v-model 的实现和 Vue.js 2.x 实现是很类似的，
 从前面的示例我们知道，子组件会执行`this.$emit('update:modelValue',value)`方法派发自定义事件，$emit 内部执行了 emit 方法，我们来看一下它的实现,emit 方法支持 3 个参数，第一个参数 instance 是组件的实例，也就是执行 $emit 方法的组件实例，第二个参数 event 是自定义事件名称，第三个参数 args 是事件传递的参数,emit 方法首先获取事件名称，把传递的 event 首字母大写，然后前面加上 on 字符串，比如我们前面派发的 update:modelValue 事件名称，处理后就变成了 onUpdate:modelValue,接下来，通过这个事件名称，从 props 中根据事件名找到对应的 prop 值，作为事件的回调函数,如果找不到对应的 prop 并且 event 是以 update: 开头的，则尝试把 event 名先转成连字符形式然后再处理,找到回调函数 handler 后，再去执行这个回调函数，并且把参数 args 传入。针对 v-model 场景，这个回调函数就是拿到子组件回传的数据然后修改父元素传入到子组件的 prop 数据，这样就达到了数据双向通讯的目的
 
 了解 v-model 在普通表单元素上以及在自定义指令上的实现原理分别是怎样的，以及了解自定义事件派发的实现原理
+
+## 内置组件：学习 Vue 内置组件的实现原理
+
+Vue.js 除了提供了组件化和响应式的能力，以及实用的特性外，还提供了很多好用的内置组件辅助我们的开发，这些极大地丰富了 Vue.js 的能力。
+
+那么，既然我们平时经常用到这些内置组件，了解它的实现原理可以让我们更好地运用这些组件，遇到 Bug 后可以及时定位问题。同时 Vue.js 内置组件的源码，也是一个很好的编写组件的参考学习范例，我们可以借鉴其中的一些实现为自己所用。
+
+既然学习内置组件有那么多的好处，那么就让我们马不停蹄，一起来探索内置组件的秘密吧
+
+## Teleport 组件：如何脱离当前组件渲染子组件？
+
+我们都知道，Vue.js 的核心思想之一是组件化，组件就是 DOM 的映射，我们通过嵌套的组件构成了一个组件应用程序的树。
+
+但是，有些时候组件模板的一部分在逻辑上属于该组件，而从技术角度来看，最好将模板的这一部分移动到应用程序之外的其他位置。
+
+一个常见的场景是创建一个包含全屏模式的对话框组件。在大多数情况下，我们希望对话框的逻辑存在于组件中，但是对话框的定位 CSS 是一个很大的问题，它非常容易受到外层父组件的 CSS 影响
+
+```html
+<template>
+  <div v-show="visible" class="dialog">
+    <div class="dialog-body">
+      <p>I'm a dialog!</p>
+
+      <button @click="visible=false">Close</button>
+    </div>
+  </div>
+</template>
+
+<script>
+  export default {
+    data() {
+      return {
+        visible: false,
+      };
+    },
+
+    methods: {
+      show() {
+        this.visible = true;
+      },
+    },
+  };
+</script>
+
+<style>
+  .dialog {
+    position: absolute;
+
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    background-color: rgba(0, 0, 0, 0.5);
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+  }
+
+  .dialog .dialog-body {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background-color: white;
+
+    width: 300px;
+
+    height: 300px;
+
+    padding: 5px;
+  }
+</style>
+```
+
+```html
+<template>
+  <button @click="showDialog">Show dialog</button>
+
+  <dialog ref="dialog"></dialog>
+</template>
+
+<script>
+  import Dialog from "./components/dialog";
+
+  export default {
+    components: {
+      Dialog,
+    },
+
+    methods: {
+      showDialog() {
+        this.$refs.dialog.show();
+      },
+    },
+  };
+</script>
+```
+
+因为我们的 dialog 组件使用的是 position:absolute 绝对定位的方式，如果它的父级 DOM 有 position 不为 static 的布局方式，那么 dialog 的定位就受到了影响，不能按预期渲染了,所以一种好的解决方案是把 dialog 组件渲染的这部分 DOM 挂载到 body 下面，这样就不会受到父级样式的影响了。在 Vue.js 2.x 中，想实现上面的需求，你可以依赖开源插件 portal-vue 或者是 vue-create-api,而 Vue.js 3.0 把这一能力内置到内核中，提供了一个内置组件 Teleport，它可以轻松帮助我们实现上述需求
+
+```html
+<template>
+  <button @click="showDialog">Show dialog</button>
+
+  <teleport to="body">
+    <dialog ref="dialog"></dialog>
+  </teleport>
+</template>
+
+<script>
+  import Dialog from "./components/dialog";
+
+  export default {
+    components: {
+      Dialog,
+    },
+
+    methods: {
+      showDialog() {
+        this.$refs.dialog.show();
+      },
+    },
+  };
+</script>
+```
+
+Teleport 组件使用起来非常简单，套在想要在别处渲染的组件或者 DOM 节点的外部，然后通过 to 这个 prop 去指定渲染到的位置，to 可以是一个 DOM 选择器字符串，也可以是一个 DOM 节点,了解了使用方式，接下来，我们就来分析它的实现原理，看看 Teleport 是如何脱离当前组件渲染子组件的
+
+### Teleport 实现原理
+
+对于这类内置组件，Vue.js 从编译阶段就做了特殊处理，我们先来看一下前面示例模板编译后的结果
+
+```js
+import {
+  createVNode as _createVNode,
+  resolveComponent as _resolveComponent,
+  Teleport as _Teleport,
+  openBlock as _openBlock,
+  createBlock as _createBlock,
+} from "vue";
+
+export function render(_ctx, _cache, $props, $setup, $data, $options) {
+  const _component_Dialog = _resolveComponent("Dialog");
+
+  return (
+    _openBlock(),
+    _createBlock("template", null, [
+      _createVNode(
+        "button",
+        { onClick: _ctx.showDialog },
+        "Show dialog",
+        8 /* PROPS */,
+        ["onClick"]
+      ),
+
+      (_openBlock(),
+      _createBlock(_Teleport, { to: "body" }, [
+        _createVNode(
+          _component_Dialog,
+          { ref: "dialog" },
+          null,
+          512 /* NEED_PATCH */
+        ),
+      ])),
+    ])
+  );
+}
+```
+
+可以看到，对于 teleport 标签，它是直接创建了 Teleport 内置组件,Teleport 组件的实现就是一个对象，对外提供了几个方法。其中 process 方法负责组件的创建和更新逻辑，remove 方法负责组件的删除逻辑，接下来我们就从这三个方面来分析 Teleport 的实现原理
+
+### Teleport 组件创建
+
+回顾组件创建的过程，会经历 patch 阶段，在 patch 阶段，会判断如果 type 是一个 Teleport 组件，则会执行它的 process 方法，Teleport 组件创建部分主要分为三个步骤，第一步在主视图里插入注释节点或者空白文本节点，第二步获取目标元素节点，第三步往目标元素插入 Teleport 组件的子节点
+
+我们先来看第一步，会在非生产环境往 Teleport 组件原本的位置插入注释节点，在生产环境插入空白文本节点。在开发环境中，组件的 el 对象指向 teleport start 注释节点，组件的 anchor 对象指向 teleport end 注释节点。
+
+接着看第二步，会通过 resolveTarget 方法从 props 中的 to 属性以及 DOM 选择器拿到对应要移动到的目标元素 target。
+
+最后看第三步，会判断 disabled 变量的值，它是在 Teleport 组件中通过 prop 传递的，如果 disabled 为 true，那么子节点仍然挂载到 Teleport 原本视图的位置，如果为 false，那么子节点则挂载到 target 目标元素位置。
+
+至此，我们就已经实现了需求，把 Teleport 包裹的子节点脱离了当前组件，渲染到目标位置，是不是很简单呢
+
+### Teleport 组件更新
+
+Teleport 包裹的子节点渲染后并不是一成不变的，当组件发生更新的时候，仍然会执行 patch 逻辑走到 Teleport 的 process 方法，去处理 Teleport 组件的更新，Teleport 组件更新无非就是做几件事情：更新子节点，处理 disabled 属性变化的情况，处理 to 属性变化的情况
+
+首先，是更新 Teleport 组件的子节点，这里更新分为优化更新和普通的全量比对更新两种情况，之前分析过，就不再赘述了。
+
+接着，是判断 Teleport 组件新节点配置 disabled 属性的情况，如果满足新节点 disabled 为 true，且旧节点的 disabled 为 false 的话，说明我们需要把 Teleport 的子节点从目标元素内部移回到主视图内部了。
+
+如果新节点 disabled 为 false，那么先通过 to 属性是否改变来判断目标元素 target 有没有变化，如果有变化，则把 Teleport 的子节点移动到新的 target 内部；如果目标元素没变化，则判断旧节点的 disabled 是否为 true，如果是则把 Teleport 的子节点从主视图内部移动到目标元素内部了
+
+### Teleport 组件移除
+
+当组件移除的时候会执行 unmount 方法，它的内部会判断如果移除的组件是一个 Teleport 组件，就会执行组件的 remove 方法，Teleport 的 remove 方法实现很简单，首先通过 hostRemove 移除主视图渲染的锚点 teleport start 注释节点，然后再去遍历 Teleport 的子节点执行 remove 移除，执行完 Teleport 的 remove 方法，会继续执行 remove 方法移除 Teleport 主视图的元素 teleport end 注释节点，至此，Teleport 组件完成了移除
+
+## KeepAlive 组件：如何让组件在内存中缓存和调度
+
+通过前面的学习，我们了解到多个平行组件条件渲染，当满足条件的时候会触发某个组件的挂载，而已渲染的组件当条件不满足的时候会触发组件的卸载，组件的挂载和卸载都是一个递归过程，会有一定的性能损耗，对于这种可能会频繁切换的组件，我们有没有办法减少这其中的性能损耗呢，答案是有的，Vue.js 提供了内置组件 KeepAlive，KeepAlive 组件对组件做了一层封装，KeepAlive 是一个抽象组件，它并不会渲染成一个真实的 DOM，只会渲染内部包裹的子节点，并且让内部的子组件在切换的时候，不会走一整套递归卸载和挂载 DOM 的流程，从而优化了性能
+
+把 KeepAlive 的实现拆成四个部分：组件的渲染、缓存的设计、Props 设计和组件的卸载。接下来，我们就来依次分析它们的实现。
+
+### 组件的渲染
+
+首先，我们来看组件的渲染部分，可以看到 KeepAlive 组件使用了 Composition API 的方式去实现，我们已经学习过了，当 setup 函数返回的是一个函数，那么这个函数就是组件的渲染函数，函数先从 slots.default() 拿到子节点 children，它就是 KeepAlive 组件包裹的子组件，由于 KeepAlive 只能渲染单个子节点，所以当 children 长度大于 1 的时候会报警告，我们先不考虑缓存部分，KeepAlive 渲染的 vnode 就是子节点 children 的第一个元素，它是函数的返回值。因此我们说 KeepAlive 是抽象组件，它本身不渲染成实体节点，而是渲染它的第一个子节点。当然，没有缓存的 KeepAlive 组件是没有灵魂的，这种抽象的封装也是没有任何意义的，所以接下来我们重点来看它的缓存是如何设计的
+
+### 缓存的设计
+
+我们先来思考一件事情，我们需要缓存什么？
+
+组件的递归 patch 过程，主要就是为了渲染 DOM，显然这个递归过程是有一定的性能耗时的，既然目标是为了渲染 DOM，那么我们是不是可以把 DOM 缓存了，这样下一次渲染我们就可以直接从缓存里获取 DOM 并渲染，就不需要每次都重新递归渲染了，实际上 KeepAlive 组件就是这么做的，它注入了两个钩子函数，onBeforeMount 和 onBeforeUpdate，在这两个钩子函数内部都执行了 cacheSubtree 函数来做缓存，由于 pendingCacheKey 是在 KeepAlive 的 render 函数中才会被赋值，所以 KeepAlive 首次进入 onBeforeMount 钩子函数的时候是不会缓存的。然后 KeepAlive 执行 render 的时候，pendingCacheKey 会被赋值为 vnode.key
+
+我们注意到 KeepAlive 的子节点创建的时候都添加了一个 key 的 prop，它就是专门为 KeepAlive 的缓存设计的，这样每一个子节点都能有一个唯一的 key。
+
+当然，光有缓存还不够灵活，有些时候我们想针对某些子组件缓存，某些子组件不缓存，另外，我们还想限制 KeepAlive 组件的最大缓存个数，怎么办呢？KeepAlive 设计了几个 Props，允许我们可以对上述需求做配置。
+
+### Props 设计
+
+KeepAlive 一共支持了三个 Props，分别是 include、exclude 和 max。
+
+```js
+    props: {
+      include: [String, RegExp, Array],
+      exclude: [String, RegExp, Array],
+      max: [String, Number]
+    }
+```
+
+很好理解，如果子组件名称不匹配 include 的 vnode ，以及子组件名称匹配 exclude 的 vnode 都不应该被缓存，而应该直接返回,当然，由于 props 是响应式的，在 include 和 exclude props 发生变化的时候也应该有相关的处理逻辑
+
+监听的逻辑也很简单，当 include 发生变化的时候，从缓存中删除那些 name 不匹配 include 的 vnode 节点；当 exclude 发生变化的时候，从缓存中删除那些 name 匹配 exclude 的 vnode 节点。除了 include 和 exclude 之外，KeepAlive 组件还支持了 max prop 来控制缓存的最大个数。
+
+由于缓存本身就是占用了内存，所以有些场景我们希望限制 KeepAlive 缓存的个数，这时我们可以通过 max 属性来控制，当缓存新的 vnode 的时候，会做一定程度的缓存管理
+
+由于新的缓存 key 都是在 keys 的结尾添加的，所以当缓存的个数超过 max 的时候，就从最前面开始删除，符合 LRU 最近最少使用的算法思想
+### 组件的卸载
+
+了解完 KeepAlive 组件的渲染、缓存和 Props 设计后，我们接着来看 KeepAlive 组件的卸载过程。
+
+我们先来分析 KeepAlive 内部包裹的子组件的卸载过程，前面我们提到 KeepAlive 渲染的过程实际上是渲染它的第一个子组件节点
+
+**KeepAlive 实际上是一个抽象节点，渲染的是它的第一个子节点，并了解它的缓存设计、Props 设计和卸载过程**
